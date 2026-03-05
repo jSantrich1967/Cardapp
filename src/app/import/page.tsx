@@ -166,7 +166,7 @@ export default function ImportPage() {
       <div>
         <h1 className="text-2xl font-bold">Importar desde imagen</h1>
         <p className="text-muted-foreground">
-          Sube una captura de pantalla de una tabla con columnas: Fecha, Operación, Monto, Saldo.
+          Sube una captura de pantalla de una tabla con columnas: Fecha, Operación y Monto (Saldo es opcional).
         </p>
       </div>
 

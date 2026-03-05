@@ -74,6 +74,8 @@ export function ImportReviewGrid({
     setEditableRows((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const hasAnySaldo = editableRows.some((r) => r.saldo != null && !isNaN(Number(r.saldo)));
+
   const validRows = editableRows.filter(
     (r) =>
       r.fecha &&
@@ -119,7 +121,7 @@ export function ImportReviewGrid({
                 <th className="text-left p-2">Fecha</th>
                 <th className="text-left p-2">Operación</th>
                 <th className="text-right p-2">Monto</th>
-                <th className="text-right p-2">Saldo</th>
+                {hasAnySaldo && <th className="text-right p-2">Saldo</th>}
                 <th className="w-10" />
               </tr>
             </thead>
@@ -200,18 +202,20 @@ export function ImportReviewGrid({
                       className="h-8 text-xs text-right"
                     />
                   </td>
-                  <td className="p-2 text-right">
-                    <Input
-                      type="text"
-                      value={row.saldo ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        const n = v ? parseFloat(v.replace(",", ".")) : null;
-                        updateRow(row.id, { saldo: n });
-                      }}
-                      className="h-8 text-xs text-right"
-                    />
-                  </td>
+                  {hasAnySaldo && (
+                    <td className="p-2 text-right">
+                      <Input
+                        type="text"
+                        value={row.saldo ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const n = v ? parseFloat(v.replace(",", ".")) : null;
+                          updateRow(row.id, { saldo: n });
+                        }}
+                        className="h-8 text-xs text-right"
+                      />
+                    </td>
+                  )}
                   <td className="p-2">
                     <Button
                       variant="ghost"
