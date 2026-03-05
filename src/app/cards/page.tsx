@@ -14,7 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, CreditCard } from "lucide-react";
 
 interface CardItem {
   id: string;
@@ -163,6 +164,12 @@ export default function CardsPage() {
               <CardContent>
                 <p className="text-sm text-muted-foreground">•••• {c.last4}</p>
                 <p className="text-xs text-muted-foreground mt-1 capitalize">{c.status}</p>
+                <Link href={`/transactions?cardId=${c.id}`}>
+                  <Button variant="outline" size="sm" className="mt-3 w-full">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Ver transacciones
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           ))}

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -11,8 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard } from "@/lib/utils/balance";
-import { Pencil, Trash2 } from "lucide-react";
+import { parseAmount } from "@/lib/utils/parse";
+import { Plus, Trash2 } from "lucide-react";
 
 interface CardItem {
   id: string;
@@ -39,13 +51,28 @@ const OP_LABELS: Record<string, string> = {
   FEE_MERCHANT: "Fee Merchant",
 };
 
-export default function TransactionsPage() {
+function TransactionsContent() {
+  const searchParams = useSearchParams();
   const [cards, setCards] = useState<CardItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filterCardId, setFilterCardId] = useState<string>("all");
+
+  // Pre-select card from URL (e.g. /transactions?cardId=xxx from cards page)
+  useEffect(() => {
+    const cardId = searchParams.get("cardId");
+    if (cardId) setFilterCardId(cardId);
+  }, [searchParams]);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    cardId: "",
+    date: new Date().toISOString().slice(0, 10),
+    operationType: "RECARGA" as "RECARGA" | "PROCESADA",
+    amount: "",
+    notes: "",
+  });
 
   const fetchCards = () => {
     fetch("/api/cards")
@@ -146,10 +173,145 @@ export default function TransactionsPage() {
     if (res.ok) refetchTransactions();
   };
 
+  const openAddDialog = () => {
+    setAddForm({
+      cardId: filterCardId !== "all" ? filterCardId : cards[0]?.id ?? "",
+      date: new Date().toISOString().slice(0, 10),
+      operationType: "RECARGA",
+      amount: "",
+      notes: "",
+    });
+    setAddOpen(true);
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = parseAmount(addForm.amount);
+    if (amountNum == null || isNaN(amountNum) || amountNum <= 0) {
+      alert("Ingresa un monto válido (ej: 100 o 1234,56)");
+      return;
+    }
+    if (!addForm.cardId) {
+      alert("Selecciona una tarjeta");
+      return;
+    }
+    const res = await fetch("/api/transactions/manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cardId: addForm.cardId,
+        date: addForm.date,
+        operationType: addForm.operationType,
+        amount: amountNum,
+        notes: addForm.notes || null,
+      }),
+    });
+    if (res.ok) {
+      setAddOpen(false);
+      refetchTransactions();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Error al crear transacción");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Transacciones</h1>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={openAddDialog} disabled={cards.length === 0}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar transacción
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva transacción</DialogTitle>
+              <DialogDescription>
+                Agrega una Recarga o Procesada. Los fees se generan automáticamente para Procesada.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddTransaction} className="space-y-4">
+              <div>
+                <Label htmlFor="add-card">Tarjeta</Label>
+                <Select
+                  value={addForm.cardId}
+                  onValueChange={(v) => setAddForm((f) => ({ ...f, cardId: v }))}
+                  required
+                >
+                  <SelectTrigger id="add-card" className="mt-1">
+                    <SelectValue placeholder="Selecciona tarjeta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cards.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.cardholderName} •••• {c.last4}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="add-date">Fecha</Label>
+                <Input
+                  id="add-date"
+                  type="date"
+                  value={addForm.date}
+                  onChange={(e) => setAddForm((f) => ({ ...f, date: e.target.value }))}
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="add-type">Tipo</Label>
+                <Select
+                  value={addForm.operationType}
+                  onValueChange={(v: "RECARGA" | "PROCESADA") =>
+                    setAddForm((f) => ({ ...f, operationType: v }))
+                  }
+                >
+                  <SelectTrigger id="add-type" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RECARGA">Recarga</SelectItem>
+                    <SelectItem value="PROCESADA">Procesada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="add-amount">Monto</Label>
+                <Input
+                  id="add-amount"
+                  type="text"
+                  value={addForm.amount}
+                  onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="Ej: 100 o 1.234,56"
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="add-notes">Notas (opcional)</Label>
+                <Input
+                  id="add-notes"
+                  value={addForm.notes}
+                  onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Notas"
+                  className="mt-1"
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Agregar</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -294,5 +456,13 @@ export default function TransactionsPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<p className="text-muted-foreground">Cargando...</p>}>
+      <TransactionsContent />
+    </Suspense>
   );
 }
