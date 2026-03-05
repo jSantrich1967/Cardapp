@@ -46,12 +46,12 @@ export default function HomePage() {
         <Card>
           <CardHeader>
             <BarChart3 className="h-8 w-8 text-primary" />
-            <CardTitle>Reportes</CardTitle>
-            <CardDescription>Dashboard, gráficos y exportación a CSV/XLSX</CardDescription>
+            <CardTitle>Transacciones</CardTitle>
+            <CardDescription>Lista de transacciones con exportación a Excel y PDF</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">
-              <Link href="/reports">Ver Reportes</Link>
+              <Link href="/transactions">Ver Transacciones</Link>
             </Button>
           </CardContent>
         </Card>

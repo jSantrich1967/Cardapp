@@ -24,7 +24,10 @@ import {
 } from "@/components/ui/dialog";
 import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard } from "@/lib/utils/balance";
 import { parseAmount } from "@/lib/utils/parse";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, FileSpreadsheet, FileText } from "lucide-react";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface CardItem {
   id: string;
@@ -217,6 +220,58 @@ function TransactionsContent() {
     refetchTransactions();
   };
 
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
+
+  const exportExcel = () => {
+    const headers = filterCardId === "all"
+      ? ["Fecha", "Tarjeta", "Tipo", "Monto", "Saldo"]
+      : ["Fecha", "Tipo", "Monto", "Saldo"];
+    const rows = displayRows.map((t) => {
+      const card = cardMap.get(t.cardId);
+      const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : t.cardId;
+      const tipo = (t.parentTransactionId ? "↳ " : "") + (OP_LABELS[t.operationType] ?? t.operationType);
+      const monto = Number(t.amount) >= 0 ? `+$${Math.abs(Number(t.amount)).toFixed(2)}` : `-$${Math.abs(Number(t.amount)).toFixed(2)}`;
+      const saldo = `$${(balanceByTx.get(t.id) ?? balanceByTx.get(`${t.date}-${t.amount}`) ?? 0).toFixed(2)}`;
+      if (filterCardId === "all") {
+        return [t.date.split("T")[0] ?? t.date, cardLabel, tipo, monto, saldo];
+      }
+      return [t.date.split("T")[0] ?? t.date, tipo, monto, saldo];
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), "Transacciones");
+    XLSX.writeFile(wb, `transacciones-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Transacciones CardOps", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Generado: ${new Date().toLocaleDateString("es")}`, 14, 30);
+
+    const headers = filterCardId === "all"
+      ? ["Fecha", "Tarjeta", "Tipo", "Monto", "Saldo"]
+      : ["Fecha", "Tipo", "Monto", "Saldo"];
+    const body = displayRows.map((t) => {
+      const card = cardMap.get(t.cardId);
+      const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : t.cardId;
+      const tipo = (t.parentTransactionId ? "↳ " : "") + (OP_LABELS[t.operationType] ?? t.operationType);
+      const monto = Number(t.amount) >= 0 ? `+$${Math.abs(Number(t.amount)).toFixed(2)}` : `-$${Math.abs(Number(t.amount)).toFixed(2)}`;
+      const saldo = `$${(balanceByTx.get(t.id) ?? balanceByTx.get(`${t.date}-${t.amount}`) ?? 0).toFixed(2)}`;
+      if (filterCardId === "all") {
+        return [t.date.split("T")[0] ?? t.date, cardLabel, tipo, monto, saldo];
+      }
+      return [t.date.split("T")[0] ?? t.date, tipo, monto, saldo];
+    });
+
+    autoTable(doc, {
+      startY: 38,
+      head: [headers],
+      body,
+    });
+    doc.save(`transacciones-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   const openAddDialog = () => {
     setAddForm({
       cardId: filterCardId !== "all" ? filterCardId : cards[0]?.id ?? "",
@@ -263,13 +318,22 @@ function TransactionsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Transacciones</h1>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openAddDialog} disabled={cards.length === 0}>
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar transacción
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel} disabled={displayRows.length === 0}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+          <Button variant="outline" onClick={exportPdf} disabled={displayRows.length === 0}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openAddDialog} disabled={cards.length === 0}>
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar transacción
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nueva transacción</DialogTitle>
@@ -355,7 +419,8 @@ function TransactionsContent() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { transactions, cards } from "@/lib/db/schema";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
+import { getCurrentBalance } from "@/lib/utils/balance";
 
 export const dynamic = "force-dynamic";
-import { transactions, cards } from "@/lib/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
 
+/**
+ * API used by DashboardSummary for global summary and per-card balances.
+ * The Reports page was removed; export is now in Transacciones and VES Usados.
+ */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const cardId = searchParams.get("cardId");
+    const cardId = searchParams.get("cardId")?.trim() || null;
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
     const conditions = [];
-    if (cardId) conditions.push(eq(transactions.cardId, cardId));
+    if (cardId && cardId !== "all") conditions.push(eq(transactions.cardId, cardId));
     if (from) conditions.push(gte(transactions.date, from));
     if (to) conditions.push(lte(transactions.date, to));
 
@@ -23,8 +28,8 @@ export async function GET(request: Request) {
             .select()
             .from(transactions)
             .where(and(...conditions))
-            .orderBy(transactions.date)
-        : await db.select().from(transactions).orderBy(transactions.date);
+            .orderBy(asc(transactions.date), asc(transactions.createdAt))
+        : await db.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt));
 
     const recarga = txList
       .filter((t) => t.operationType === "RECARGA")
@@ -38,41 +43,35 @@ export async function GET(request: Request) {
     const feeMerchant = txList
       .filter((t) => t.operationType === "FEE_MERCHANT")
       .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-    const balance = txList.reduce((s, t) => s + Number(t.amount), 0);
+    const balance = getCurrentBalance(txList);
 
-    const monthly = txList.reduce(
-      (acc, t) => {
-        const month = t.date.slice(0, 7);
-        if (!acc[month]) acc[month] = { recarga: 0, procesada: 0, feeVzla: 0, feeMerchant: 0 };
-        if (t.operationType === "RECARGA") acc[month]!.recarga += Number(t.amount);
-        if (t.operationType === "PROCESADA") acc[month]!.procesada += Math.abs(Number(t.amount));
-        if (t.operationType === "FEE_VZLA") acc[month]!.feeVzla += Math.abs(Number(t.amount));
-        if (t.operationType === "FEE_MERCHANT") acc[month]!.feeMerchant += Math.abs(Number(t.amount));
-        return acc;
-      },
-      {} as Record<string, { recarga: number; procesada: number; feeVzla: number; feeMerchant: number }>
-    );
+    const cardIds = [...new Set(txList.map((t) => t.cardId))];
+    const cardList = cardIds.length > 0 ? await db.select().from(cards).where(inArray(cards.id, cardIds)) : [];
 
-    const cardsList = await db.select().from(cards);
-    const byCard = cardsList.map((c) => {
-      const cardTx = txList.filter((t) => t.cardId === c.id);
-      const bal = cardTx.reduce((s, t) => s + Number(t.amount), 0);
-      return {
-        id: c.id,
-        cardholderName: c.cardholderName,
-        last4: c.last4,
-        balance: bal,
-        txCount: cardTx.length,
-      };
-    });
+    const balanceByCard = new Map<string, number>();
+    for (const t of txList) {
+      const current = balanceByCard.get(t.cardId) ?? 0;
+      balanceByCard.set(t.cardId, current + Number(t.amount));
+    }
+
+    const byCard = cardList.map((c) => ({
+      id: c.id,
+      cardholderName: c.cardholderName,
+      last4: c.last4,
+      balance: balanceByCard.get(c.id) ?? 0,
+      txCount: txList.filter((t) => t.cardId === c.id).length,
+    }));
 
     return NextResponse.json({
       summary: { recarga, procesada, feeVzla, feeMerchant, balance },
-      monthly: Object.entries(monthly).map(([month, data]) => ({ month, ...data })),
+      monthly: [],
       byCard,
     });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to fetch report" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al cargar reportes. Verifica la conexión a la base de datos." },
+      { status: 500 }
+    );
   }
 }

@@ -10,7 +10,6 @@ const navItems = [
   { href: "/cards", label: "Tarjetas", icon: CreditCard },
   { href: "/import", label: "Importar", icon: Upload },
   { href: "/transactions", label: "Transacciones", icon: List },
-  { href: "/reports", label: "Reportes", icon: BarChart3 },
   { href: "/reconciliation", label: "Reconciliación", icon: FileCheck },
   { href: "/ves-usados", label: "VES Usados", icon: DollarSign },
 ];

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -10,6 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { FileSpreadsheet, FileText } from "lucide-react";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const TIPO_CAMBIO = 515;
 const FEE_MERCHANT_PCT = 0.04; // 4% por recarga en bolívares
@@ -100,13 +105,73 @@ export default function VesUsadosPage() {
   const cardMap = new Map(cards.map((c) => [c.id, c]));
   const totalVes = rows.length > 0 ? rows[rows.length - 1]!.saldo : 0;
 
+  const exportExcel = () => {
+    const headers = ["Fecha", "Tarjeta", "USD$", "VES", "Fee Merchant 4%", "Saldo"];
+    const exportRows = rows.map((r) => {
+      const card = cardMap.get(r.cardId);
+      const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : r.cardId;
+      return [
+        r.date.split("T")[0] ?? r.date,
+        cardLabel,
+        r.usd.toFixed(2),
+        r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+      ];
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...exportRows]), "VES Usados");
+    XLSX.writeFile(wb, `ves-usados-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("VES Usados - CardOps", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Generado: ${new Date().toLocaleDateString("es")} | Tipo cambio: ${TIPO_CAMBIO}`, 14, 30);
+
+    const headers = ["Fecha", "Tarjeta", "USD$", "VES", "Fee 4%", "Saldo"];
+    const body = rows.map((r) => {
+      const card = cardMap.get(r.cardId);
+      const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : r.cardId;
+      return [
+        r.date.split("T")[0] ?? r.date,
+        cardLabel,
+        r.usd.toFixed(2),
+        r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 38,
+      head: [headers],
+      body,
+    });
+    doc.save(`ves-usados-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">VES Usados</h1>
-        <p className="text-muted-foreground">
-          Recargas en USD convertidas a VES (tipo de cambio: {TIPO_CAMBIO}). Fee Merchant 4% por recarga en bolívares.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">VES Usados</h1>
+          <p className="text-muted-foreground">
+            Recargas en USD convertidas a VES (tipo de cambio: {TIPO_CAMBIO}). Fee Merchant 4% por recarga en bolívares.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel} disabled={rows.length === 0}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+          <Button variant="outline" onClick={exportPdf} disabled={rows.length === 0}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+        </div>
       </div>
 
       <Card>
