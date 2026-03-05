@@ -146,12 +146,26 @@ function TransactionsContent() {
     });
   });
   const displayRows: Transaction[] = [];
+  const parentIds = new Set(parents.map((p) => p.id));
   for (const p of parents) {
     displayRows.push(p);
     if (p.operationType === "PROCESADA") {
       displayRows.push(...(feesByParent.get(p.id) ?? []));
     }
   }
+  // When filtering by fees only: parents may be empty, but we have fees in feesByParent
+  // Add orphan fees (parent not in result) so they appear when filtering by FEES
+  const orphanFees: Transaction[] = [];
+  for (const [parentId, arr] of feesByParent) {
+    if (!parentIds.has(parentId)) orphanFees.push(...arr);
+  }
+  orphanFees.sort((a, b) => {
+    const dateCmp = toDateStr(a.date).localeCompare(toDateStr(b.date));
+    if (dateCmp !== 0) return dateCmp;
+    const order: Record<string, number> = { FEE_VZLA: 0, FEE_MERCHANT: 1 };
+    return (order[a.operationType] ?? 2) - (order[b.operationType] ?? 2);
+  });
+  displayRows.push(...orphanFees);
 
   const balanceByTx =
     filterCardId && filterCardId !== "all"
@@ -390,6 +404,7 @@ function TransactionsContent() {
                             <SelectItem value="all">Todos</SelectItem>
                             <SelectItem value="RECARGA">Recarga</SelectItem>
                             <SelectItem value="PROCESADA">Procesada</SelectItem>
+                            <SelectItem value="FEES">Fees (Vzla + Merchant)</SelectItem>
                             <SelectItem value="FEE_VZLA">Fee Vzla</SelectItem>
                             <SelectItem value="FEE_MERCHANT">Fee Merchant</SelectItem>
                           </SelectContent>

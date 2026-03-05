@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 import { transactions } from "@/lib/db/schema";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +17,14 @@ export async function GET(request: Request) {
     if (cardId && cardId !== "all") conditions.push(eq(transactions.cardId, cardId));
     if (from) conditions.push(gte(transactions.date, from));
     if (to) conditions.push(lte(transactions.date, to));
-    if (type) conditions.push(eq(transactions.operationType, type as any));
+    if (type) {
+      // "FEES" = both Fee Vzla and Fee Merchant
+      if (type === "FEES") {
+        conditions.push(inArray(transactions.operationType, ["FEE_VZLA", "FEE_MERCHANT"]));
+      } else {
+        conditions.push(eq(transactions.operationType, type as any));
+      }
+    }
 
     // Order: date ascending (oldest first, like bank statement), then createdAt for same-day order
     const result =
