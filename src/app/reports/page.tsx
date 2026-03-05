@@ -60,28 +60,30 @@ const COLORS = ["#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
 export default function ReportsPage() {
   const [cards, setCards] = useState<CardItem[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [cardId, setCardId] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const fetchReport = () => {
+  useEffect(() => {
+    fetch("/api/cards")
+      .then((r) => r.json())
+      .then((data) => setCards(Array.isArray(data) ? data : []));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
     const params = new URLSearchParams();
     if (cardId && cardId !== "all") params.set("cardId", cardId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
     fetch(`/api/reports?${params}`)
       .then((r) => r.json())
-      .then(setReport);
-  };
-
-  useEffect(() => {
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then(setCards);
-  }, []);
-
-  useEffect(() => {
-    fetchReport();
+      .then((data) => {
+        setReport(data?.summary ? data : null);
+      })
+      .catch(() => setReport(null))
+      .finally(() => setLoading(false));
   }, [cardId, from, to]);
 
   const exportCsv = async () => {
@@ -91,10 +93,11 @@ export default function ReportsPage() {
     if (to) params.set("to", to);
     const res = await fetch(`/api/transactions?${params}`);
     const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
     const headers = ["Fecha", "Tipo", "Monto", "Notas"];
-    const rows = data.map(
-      (t: { date: string; operationType: string; amount: string; notes: string | null }) =>
-        [t.date, t.operationType, t.amount, t.notes || ""].join(",")
+    const rows = list.map(
+      (t: { date?: string; operationType?: string; amount?: string; notes?: string | null }) =>
+        [(t.date ?? ""), (t.operationType ?? ""), (t.amount ?? ""), (t.notes ?? "")].join(",")
     );
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
@@ -106,11 +109,16 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (!report) return <p className="text-muted-foreground">Cargando...</p>;
+  if (loading || !report?.summary) {
+    return <p className="text-muted-foreground">{loading ? "Cargando..." : "No hay datos para mostrar."}</p>;
+  }
 
+  const summary = report.summary;
+  const monthly = report.monthly ?? [];
+  const byCard = report.byCard ?? [];
   const feeData = [
-    { name: "Fee Vzla", value: report.summary.feeVzla, color: COLORS[0] },
-    { name: "Fee Merchant", value: report.summary.feeMerchant, color: COLORS[1] },
+    { name: "Fee Vzla", value: summary.feeVzla ?? 0, color: COLORS[0] },
+    { name: "Fee Merchant", value: summary.feeMerchant ?? 0, color: COLORS[1] },
   ];
 
   return (
@@ -132,7 +140,7 @@ export default function ReportsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {cards.map((c) => (
+                  {(cards || []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.cardholderName} •••• {c.last4}
                     </SelectItem>
@@ -158,7 +166,7 @@ export default function ReportsPage() {
             <CardTitle className="text-sm">Saldo</CardTitle>
             <CardContent className="pt-2">
               <p className="text-2xl font-bold text-primary">
-                ${report.summary.balance.toFixed(2)}
+                ${(summary.balance ?? 0).toFixed(2)}
               </p>
             </CardContent>
           </CardHeader>
@@ -168,7 +176,7 @@ export default function ReportsPage() {
             <CardTitle className="text-sm">Total Recarga</CardTitle>
             <CardContent className="pt-2">
               <p className="text-2xl font-bold text-green-600">
-                ${report.summary.recarga.toFixed(2)}
+                ${(summary.recarga ?? 0).toFixed(2)}
               </p>
             </CardContent>
           </CardHeader>
@@ -178,7 +186,7 @@ export default function ReportsPage() {
             <CardTitle className="text-sm">Total Procesada</CardTitle>
             <CardContent className="pt-2">
               <p className="text-2xl font-bold text-red-600">
-                ${report.summary.procesada.toFixed(2)}
+                ${(summary.procesada ?? 0).toFixed(2)}
               </p>
             </CardContent>
           </CardHeader>
@@ -188,7 +196,7 @@ export default function ReportsPage() {
             <CardTitle className="text-sm">Total Fees</CardTitle>
             <CardContent className="pt-2">
               <p className="text-2xl font-bold">
-                ${(report.summary.feeVzla + report.summary.feeMerchant).toFixed(2)}
+                ${((summary.feeVzla ?? 0) + (summary.feeMerchant ?? 0)).toFixed(2)}
               </p>
             </CardContent>
           </CardHeader>
@@ -202,8 +210,9 @@ export default function ReportsPage() {
             <CardDescription>Procesada + Fees</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={report.monthly}>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthly}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -211,8 +220,9 @@ export default function ReportsPage() {
                 <Bar dataKey="procesada" fill="#8b5cf6" name="Procesada" />
                 <Bar dataKey="feeVzla" fill="#a78bfa" name="Fee Vzla" />
                 <Bar dataKey="feeMerchant" fill="#c4b5fd" name="Fee Merchant" />
-              </BarChart>
-            </ResponsiveContainer>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -221,24 +231,30 @@ export default function ReportsPage() {
             <CardTitle>Desglose de fees</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={feeData.filter((d) => d.value > 0)}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
-                >
-                  {feeData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="h-[300px] w-full">
+              {feeData.some((d) => d.value > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={feeData.filter((d) => d.value > 0)}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+                    >
+                      {feeData.filter((d) => d.value > 0).map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-muted-foreground text-center py-20">No hay fees registrados</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -249,7 +265,7 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {report.byCard.map((c) => (
+            {byCard.map((c) => (
               <div
                 key={c.id}
                 className="flex justify-between items-center py-2 border-b"
