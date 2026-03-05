@@ -85,6 +85,15 @@ export const importBatches = pgTable("import_batches", {
     .notNull(),
 });
 
+// Tipo de cambio de mercado por fecha (para Resultados: VES ÷ tasa = USD)
+export const exchangeRates = pgTable("exchange_rates", {
+  date: date("date").primaryKey(),
+  rate: decimal("rate", { precision: 15, scale: 4 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 // Import rows (raw extracted data before confirmation)
 export const importRows = pgTable("import_rows", {
   id: uuid("id").primaryKey().defaultRandom(),
