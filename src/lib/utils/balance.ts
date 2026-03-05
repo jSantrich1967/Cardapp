@@ -5,7 +5,7 @@
 
 import type { OperationType } from "./parse";
 
-/** Returns map of transaction id (or date if no id) -> running balance after that transaction */
+/** Returns map of transaction id -> running balance after that transaction (single card) */
 export function computeRunningBalance(
   transactions: Array<{ id?: string; date: string; operationType: OperationType; amount: string }>
 ): Map<string, number> {
@@ -20,6 +20,28 @@ export function computeRunningBalance(
     balance += Number(t.amount);
     const key = t.id ?? `${t.date}-${t.operationType}-${t.amount}`;
     result.set(key, balance);
+  }
+  return result;
+}
+
+/** Returns map of transaction id -> running balance per card (for multiple cards) */
+export function computeRunningBalancePerCard(
+  transactions: Array<{ id?: string; cardId?: string; date: string; amount: string }>
+): Map<string, number> {
+  const sorted = [...transactions].sort(
+    (a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime() ||
+      (a.id || "").localeCompare(b.id || "")
+  );
+  const balanceByCard = new Map<string, number>();
+  const result = new Map<string, number>();
+  for (const t of sorted) {
+    const cardId = t.cardId ?? "default";
+    const current = balanceByCard.get(cardId) ?? 0;
+    const newBalance = current + Number(t.amount);
+    balanceByCard.set(cardId, newBalance);
+    const key = t.id ?? `${t.date}-${t.amount}`;
+    result.set(key, newBalance);
   }
   return result;
 }

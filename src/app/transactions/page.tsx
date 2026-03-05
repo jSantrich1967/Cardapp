@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getCurrentBalance, computeRunningBalance } from "@/lib/utils/balance";
+import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard } from "@/lib/utils/balance";
 import { Pencil, Trash2 } from "lucide-react";
 
 interface CardItem {
@@ -48,10 +48,7 @@ export default function TransactionsPage() {
   const fetchCards = () => {
     fetch("/api/cards")
       .then((r) => r.json())
-      .then((data) => {
-        setCards(data);
-        if (data.length > 0 && filterCardId === "all") setFilterCardId(data[0].id);
-      });
+      .then((data) => setCards(Array.isArray(data) ? data : []));
   };
 
   const fetchTransactions = () => {
@@ -61,7 +58,7 @@ export default function TransactionsPage() {
     if (filterTo) params.set("to", filterTo);
     fetch(`/api/transactions?${params}`)
       .then((r) => r.json())
-      .then(setTransactions)
+      .then((data) => setTransactions(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   };
 
@@ -80,9 +77,14 @@ export default function TransactionsPage() {
       : transactions;
 
   const sortedByDate = [...filteredByCard].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime() ||
+      (a.id || "").localeCompare(b.id || "")
   );
-  const balanceByTx = computeRunningBalance(sortedByDate);
+  const balanceByTx =
+    filterCardId && filterCardId !== "all"
+      ? computeRunningBalance(sortedByDate)
+      : computeRunningBalancePerCard(sortedByDate);
   const balance = getCurrentBalance(filteredByCard);
 
   const handleDelete = async (id: string) => {
@@ -109,7 +111,7 @@ export default function TransactionsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {cards.map((c) => (
+                  {(cards || []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.cardholderName} •••• {c.last4}
                     </SelectItem>
@@ -156,6 +158,9 @@ export default function TransactionsPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2">Fecha</th>
+                    {filterCardId === "all" && (
+                      <th className="text-left p-2">Tarjeta</th>
+                    )}
                     <th className="text-left p-2">Tipo</th>
                     <th className="text-right p-2">Monto</th>
                     <th className="text-right p-2">Saldo</th>
@@ -166,6 +171,14 @@ export default function TransactionsPage() {
                   {sortedByDate.map((t) => (
                     <tr key={t.id} className="border-b">
                       <td className="p-2">{t.date.split("T")[0] ?? t.date}</td>
+                      {filterCardId === "all" && (
+                        <td className="p-2">
+                          {(() => {
+                            const c = (cards || []).find((x) => x.id === t.cardId);
+                            return c ? `${c.cardholderName} •••• ${c.last4}` : "—";
+                          })()}
+                        </td>
+                      )}
                       <td className="p-2">{OP_LABELS[t.operationType] ?? t.operationType}</td>
                       <td
                         className={`p-2 text-right ${
@@ -175,8 +188,8 @@ export default function TransactionsPage() {
                         {Number(t.amount) >= 0 ? "+" : ""}
                         ${Math.abs(Number(t.amount)).toFixed(2)}
                       </td>
-                      <td className="p-2 text-right font-medium">
-                        ${(balanceByTx.get(t.id) ?? 0).toFixed(2)}
+                      <td className="p-2 text-right font-medium text-primary">
+                        ${(balanceByTx.get(t.id) ?? balanceByTx.get(`${t.date}-${t.amount}`) ?? 0).toFixed(2)}
                       </td>
                       <td className="p-2">
                         <Button
