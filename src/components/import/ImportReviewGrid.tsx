@@ -17,28 +17,40 @@ import { AlertTriangle } from "lucide-react";
 
 const OPERATION_TYPES = ["RECARGA", "PROCESADA", "FEE_VZLA", "FEE_MERCHANT"] as const;
 
+interface CardItem {
+  id: string;
+  cardholderName: string;
+  last4: string;
+}
+
 interface EditableRow extends ParsedRow {
   id: string;
+  cardId?: string;
   isDuplicate?: boolean;
 }
 
 export function ImportReviewGrid({
   rows,
+  cards,
+  defaultCardId,
   extractedCardName,
   extractedLast4,
   onConfirm,
   onCancel,
 }: {
   rows: ParsedRow[];
+  cards: CardItem[];
+  defaultCardId: string;
   extractedCardName: string;
   extractedLast4: string;
-  onConfirm: (rows: ParsedRow[]) => Promise<void>;
+  onConfirm: (rows: Array<ParsedRow & { cardId?: string }>) => Promise<void>;
   onCancel: () => void;
 }) {
   const [editableRows, setEditableRows] = useState<EditableRow[]>(() =>
     rows.map((r, i) => ({
       ...r,
       id: `row-${i}`,
+      cardId: defaultCardId,
     }))
   );
 
@@ -74,6 +86,7 @@ export function ImportReviewGrid({
     const toSend = validRows.map(({ id, isDuplicate, ...r }) => ({
       ...r,
       operationType: (r.operationType || (r.operacion ? normalizeOp(r.operacion) : "RECARGA")) as ParsedRow["operationType"],
+      cardId: r.cardId || defaultCardId,
     }));
     onConfirm(toSend);
   };
@@ -93,8 +106,8 @@ export function ImportReviewGrid({
         <CardTitle>Paso 2: Revisar y editar datos extraídos</CardTitle>
         <CardDescription>
           {extractedCardName || extractedLast4
-            ? `Tarjeta detectada: ${extractedCardName || "?"} ${extractedLast4 ? `•••• ${extractedLast4}` : ""}`
-            : "Revisa que las fechas, operaciones y montos sean correctos. Las celdas con baja confianza están resaltadas."}
+            ? `Tarjeta detectada en imagen: ${extractedCardName || "?"} ${extractedLast4 ? `•••• ${extractedLast4}` : ""}. Asigna cada fila a la tarjeta correcta.`
+            : "Asigna cada fila a la tarjeta correcta. Revisa fechas, operaciones y montos."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -102,6 +115,7 @@ export function ImportReviewGrid({
           <table className="w-full text-sm">
             <thead className="bg-muted sticky top-0">
               <tr>
+                <th className="text-left p-2">Tarjeta</th>
                 <th className="text-left p-2">Fecha</th>
                 <th className="text-left p-2">Operación</th>
                 <th className="text-right p-2">Monto</th>
@@ -121,6 +135,23 @@ export function ImportReviewGrid({
                       : ""
                   }`}
                 >
+                  <td className="p-2">
+                    <Select
+                      value={row.cardId || defaultCardId}
+                      onValueChange={(v) => updateRow(row.id, { cardId: v })}
+                    >
+                      <SelectTrigger className="h-8 text-xs min-w-[140px]">
+                        <SelectValue placeholder="Tarjeta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cards.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.cardholderName} •••• {c.last4}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
                   <td className="p-2">
                     <Input
                       type="date"

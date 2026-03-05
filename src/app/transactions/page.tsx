@@ -91,18 +91,20 @@ export default function TransactionsPage() {
       : computeRunningBalancePerCard(sortedByDate);
   const balance = getCurrentBalance(filteredByCard);
 
+  const refetchTransactions = () => {
+    const params = new URLSearchParams();
+    if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
+    if (filterFrom) params.set("from", filterFrom);
+    if (filterTo) params.set("to", filterTo);
+    fetch(`/api/transactions?${params}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => setTransactions(Array.isArray(data) ? data : []));
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta transacción?")) return;
     const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      const params = new URLSearchParams();
-      if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
-      if (filterFrom) params.set("from", filterFrom);
-      if (filterTo) params.set("to", filterTo);
-      const r = await fetch(`/api/transactions?${params}`, { cache: "no-store" });
-      const data = await r.json();
-      setTransactions(Array.isArray(data) ? data : []);
-    }
+    if (res.ok) refetchTransactions();
   };
 
   return (
@@ -183,14 +185,32 @@ export default function TransactionsPage() {
                   {sortedByDate.map((t) => (
                     <tr key={t.id} className="border-b">
                       <td className="p-2">{t.date.split("T")[0] ?? t.date}</td>
-                      {filterCardId === "all" && (
-                        <td className="p-2">
-                          {(() => {
-                            const c = (cards || []).find((x) => x.id === t.cardId);
-                            return c ? `${c.cardholderName} •••• ${c.last4}` : "—";
-                          })()}
-                        </td>
-                      )}
+                    {filterCardId === "all" && (
+                      <td className="p-2">
+                        <Select
+                          value={t.cardId}
+                          onValueChange={async (newCardId) => {
+                            const res = await fetch(`/api/transactions/${t.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ cardId: newCardId }),
+                            });
+                            if (res.ok) refetchTransactions();
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs min-w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(cards || []).map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.cardholderName} •••• {c.last4}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    )}
                       <td className="p-2">{OP_LABELS[t.operationType] ?? t.operationType}</td>
                       <td
                         className={`p-2 text-right ${

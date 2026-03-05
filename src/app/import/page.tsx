@@ -118,7 +118,7 @@ export default function ImportPage() {
     }
   }, [file, selectedCardId]);
 
-  const handleConfirmImport = async (rows: ParsedRow[]) => {
+  const handleConfirmImport = async (rows: Array<ParsedRow & { cardId?: string }>) => {
     if (!batchId) return;
     setStatus("saving");
     setError("");
@@ -132,6 +132,7 @@ export default function ImportPage() {
           saldo: r.saldo ?? undefined,
           rawText: r.rawText,
           confidence: r.confidence,
+          cardId: r.cardId,
         })),
       };
       const res = await fetch(`/api/import/${batchId}/confirm`, {
@@ -240,6 +241,8 @@ export default function ImportPage() {
       {status === "review" && (
         <ImportReviewGrid
           rows={parsedRows}
+          cards={cards}
+          defaultCardId={selectedCardId || (cards[0]?.id ?? "")}
           extractedCardName={extractedCardName}
           extractedLast4={extractedLast4}
           onConfirm={handleConfirmImport}

@@ -30,6 +30,7 @@ export async function POST(
         saldo?: number;
         rawText: string;
         confidence: number;
+        cardId?: string;
       }>;
     };
 
@@ -46,18 +47,16 @@ export async function POST(
       return NextResponse.json({ error: "Import batch not found" }, { status: 404 });
     }
 
-    const cardId = batch.cardId;
+    const defaultCardId = batch.cardId;
 
-    // Get existing transactions for duplicate check
-    const existing = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.cardId, cardId));
+    // Get all existing transactions for duplicate check (we'll filter per card)
+    const allExisting = await db.select().from(transactions);
 
     const toInsert: typeof transactions.$inferInsert[] = [];
-    const seenInBatch = new Set<string>();
+    const seenInBatch = new Map<string, Set<string>>(); // cardId -> Set<dupKey>
 
     for (const row of rows) {
+      const rowCardId = row.cardId || defaultCardId;
       const fecha = row.fecha ? new Date(row.fecha) : null;
       const operationType = row.operationType;
       const monto = Number(row.monto);
@@ -67,35 +66,36 @@ export async function POST(
       const dateStr = formatDateForDb(fecha);
       const dupKey = `${dateStr}-${operationType}-${monto.toFixed(2)}`;
 
+      const existingForCard = allExisting.filter((t) => t.cardId === rowCardId);
+      if (!seenInBatch.has(rowCardId)) seenInBatch.set(rowCardId, new Set());
+
       // Duplicate check: same card, date, op type, amount (existing or in batch)
-      const isDupExisting = existing.some(
+      const isDupExisting = existingForCard.some(
         (t) =>
           t.date === dateStr &&
           t.operationType === operationType &&
           Math.abs(Number(t.amount) - monto) < 0.01
       );
-      const isDupInBatch = seenInBatch.has(dupKey);
+      const isDupInBatch = seenInBatch.get(rowCardId)!.has(dupKey);
       if (isDupExisting || isDupInBatch) continue;
-      seenInBatch.add(dupKey);
+      seenInBatch.get(rowCardId)!.add(dupKey);
 
       // For PROCESADA: check if fees already exist (same date ±1 day, matching amounts)
-      let skipFeeGeneration = false;
       if (operationType === "PROCESADA") {
         const expectedFeeVzla = computeFeeVzla(monto);
         const expectedFeeMerchant = computeFeeMerchant(monto);
-        const hasFeeVzla = existing.some(
+        const hasFeeVzla = existingForCard.some(
           (t) =>
             t.operationType === "FEE_VZLA" &&
             datesWithinOneDay(new Date(t.date), fecha) &&
             feeMatchesExpected(Number(t.amount), expectedFeeVzla)
         );
-        const hasFeeMerchant = existing.some(
+        const hasFeeMerchant = existingForCard.some(
           (t) =>
             t.operationType === "FEE_MERCHANT" &&
             datesWithinOneDay(new Date(t.date), fecha) &&
             feeMatchesExpected(Number(t.amount), expectedFeeMerchant)
         );
-        if (hasFeeVzla && hasFeeMerchant) skipFeeGeneration = true;
       }
 
       // Sign convention: RECARGA = positive, PROCESADA/FEEs = negative
@@ -103,7 +103,7 @@ export async function POST(
         operationType === "RECARGA" ? monto : -Math.abs(monto);
 
       toInsert.push({
-        cardId,
+        cardId: rowCardId,
         date: dateStr,
         operationType,
         amount: String(signedAmount),
@@ -146,7 +146,7 @@ export async function POST(
 
       if (!rowHadFeeVzla) {
         await db.insert(transactions).values({
-          cardId,
+          cardId: t.cardId,
           date: t.date,
           operationType: "FEE_VZLA",
           amount: String(-feeVzla),
@@ -157,7 +157,7 @@ export async function POST(
       }
       if (!rowHadFeeMerchant) {
         await db.insert(transactions).values({
-          cardId,
+          cardId: t.cardId,
           date: t.date,
           operationType: "FEE_MERCHANT",
           amount: String(-feeMerchant),

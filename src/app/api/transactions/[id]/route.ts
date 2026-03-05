@@ -11,7 +11,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { date, operationType, amount, notes } = body;
+    const { date, operationType, amount, notes, cardId } = body;
 
     const [existing] = await db.select().from(transactions).where(eq(transactions.id, id));
     if (!existing) return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
@@ -21,12 +21,20 @@ export async function PATCH(
     if (operationType != null) updates.operationType = operationType;
     if (amount != null) updates.amount = amount;
     if (notes !== undefined) updates.notes = notes;
+    if (cardId != null) updates.cardId = cardId;
 
     const [updated] = await db
       .update(transactions)
       .set(updates as any)
       .where(eq(transactions.id, id))
       .returning();
+
+    if (updated && cardId != null) {
+      await db
+        .update(transactions)
+        .set({ cardId })
+        .where(eq(transactions.parentTransactionId, id));
+    }
 
     return NextResponse.json(updated);
   } catch (e) {
