@@ -119,6 +119,25 @@ export async function POST(
     // Insert transactions
     const inserted = await db.insert(transactions).values(toInsert).returning();
 
+    // Link OCR fee rows to their preceding PROCESADA (same card, same date)
+    const lastProcesadaByKey = new Map<string, string>();
+    for (const t of inserted) {
+      const key = `${t.cardId}-${t.date}`;
+      if (t.operationType === "PROCESADA") {
+        lastProcesadaByKey.set(key, t.id);
+      }
+      if (
+        (t.operationType === "FEE_VZLA" || t.operationType === "FEE_MERCHANT") &&
+        !t.parentTransactionId &&
+        lastProcesadaByKey.has(key)
+      ) {
+        await db
+          .update(transactions)
+          .set({ parentTransactionId: lastProcesadaByKey.get(key)! })
+          .where(eq(transactions.id, t.id));
+      }
+    }
+
     // Auto-generate fees for PROCESADA
     for (let i = 0; i < inserted.length; i++) {
       const t = inserted[i]!;

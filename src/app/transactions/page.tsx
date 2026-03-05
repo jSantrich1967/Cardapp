@@ -29,6 +29,7 @@ interface Transaction {
   notes: string | null;
   source: string;
   parentTransactionId?: string | null;
+  createdAt?: string;
 }
 
 const OP_LABELS: Record<string, string> = {
@@ -93,15 +94,20 @@ export default function TransactionsPage() {
       parents.push(t);
     }
   }
+  // Preserve order: date asc, then createdAt (matches bank statement / import order)
   parents.sort(
     (a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime() ||
+      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime() ||
       (a.id || "").localeCompare(b.id || "")
   );
+  // Fee order: FEE_VZLA first, then FEE_MERCHANT (or by createdAt to preserve import order)
   Array.from(feesByParent.values()).forEach((arr) => {
     arr.sort((a, b) => {
       const order: Record<string, number> = { FEE_VZLA: 0, FEE_MERCHANT: 1 };
-      return (order[a.operationType] ?? 2) - (order[b.operationType] ?? 2);
+      const typeOrder = (order[a.operationType] ?? 2) - (order[b.operationType] ?? 2);
+      if (typeOrder !== 0) return typeOrder;
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
     });
   });
   const displayRows: Transaction[] = [];
