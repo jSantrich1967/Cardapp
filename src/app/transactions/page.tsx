@@ -98,12 +98,12 @@ export default function TransactionsPage() {
       new Date(a.date).getTime() - new Date(b.date).getTime() ||
       (a.id || "").localeCompare(b.id || "")
   );
-  for (const arr of feesByParent.values()) {
+  Array.from(feesByParent.values()).forEach((arr) => {
     arr.sort((a, b) => {
       const order: Record<string, number> = { FEE_VZLA: 0, FEE_MERCHANT: 1 };
       return (order[a.operationType] ?? 2) - (order[b.operationType] ?? 2);
     });
-  }
+  });
   const displayRows: Transaction[] = [];
   for (const p of parents) {
     displayRows.push(p);

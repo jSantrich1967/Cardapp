@@ -64,7 +64,7 @@ export function ImportReviewGrid({
     });
   }, [editableRows]);
 
-  const updateRow = (id: string, updates: Partial<ParsedRow>) => {
+  const updateRow = (id: string, updates: Partial<ParsedRow & { cardId?: string }>) => {
     setEditableRows((prev) =>
       prev.map((r) => (r.id === id ? { ...r, ...updates } : r))
     );

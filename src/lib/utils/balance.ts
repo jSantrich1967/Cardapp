@@ -6,11 +6,9 @@
  * - PROCESADA, FEE_VZLA, FEE_MERCHANT: monto negativo → resta del saldo
  */
 
-import type { OperationType } from "./parse";
-
 /** Returns map of transaction id -> running balance after that transaction (single card) */
 export function computeRunningBalance(
-  transactions: Array<{ id?: string; date: string; operationType: OperationType; amount: string }>
+  transactions: Array<{ id?: string; date: string; operationType?: string; amount: string }>
 ): Map<string, number> {
   const sorted = [...transactions].sort(
     (a, b) =>
@@ -21,7 +19,7 @@ export function computeRunningBalance(
   const result = new Map<string, number>();
   for (const t of sorted) {
     balance += Number(t.amount);
-    const key = t.id ?? `${t.date}-${t.operationType}-${t.amount}`;
+    const key = t.id ?? `${t.date}-${t.operationType ?? ""}-${t.amount}`;
     result.set(key, balance);
   }
   return result;
