@@ -28,6 +28,7 @@ interface Transaction {
   amount: string;
   notes: string | null;
   source: string;
+  parentTransactionId?: string | null;
 }
 
 const OP_LABELS: Record<string, string> = {
@@ -80,15 +81,41 @@ export default function TransactionsPage() {
       ? transactions.filter((t) => String(t.cardId).trim() === String(filterCardId).trim())
       : transactions;
 
-  const sortedByDate = [...filteredByCard].sort(
+  // Build display list: fees appear below their parent PROCESADA
+  const feesByParent = new Map<string, Transaction[]>();
+  const parents: Transaction[] = [];
+  for (const t of filteredByCard) {
+    if (t.parentTransactionId) {
+      const arr = feesByParent.get(t.parentTransactionId) ?? [];
+      arr.push(t);
+      feesByParent.set(t.parentTransactionId, arr);
+    } else {
+      parents.push(t);
+    }
+  }
+  parents.sort(
     (a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime() ||
       (a.id || "").localeCompare(b.id || "")
   );
+  for (const arr of feesByParent.values()) {
+    arr.sort((a, b) => {
+      const order: Record<string, number> = { FEE_VZLA: 0, FEE_MERCHANT: 1 };
+      return (order[a.operationType] ?? 2) - (order[b.operationType] ?? 2);
+    });
+  }
+  const displayRows: Transaction[] = [];
+  for (const p of parents) {
+    displayRows.push(p);
+    if (p.operationType === "PROCESADA") {
+      displayRows.push(...(feesByParent.get(p.id) ?? []));
+    }
+  }
+
   const balanceByTx =
     filterCardId && filterCardId !== "all"
-      ? computeRunningBalance(sortedByDate)
-      : computeRunningBalancePerCard(sortedByDate);
+      ? computeRunningBalance(displayRows)
+      : computeRunningBalancePerCard(displayRows);
   const balance = getCurrentBalance(filteredByCard);
 
   const refetchTransactions = () => {
@@ -182,8 +209,13 @@ export default function TransactionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedByDate.map((t) => (
-                    <tr key={t.id} className="border-b">
+                  {displayRows.map((t) => {
+                    const isFee = !!t.parentTransactionId;
+                    return (
+                    <tr
+                      key={t.id}
+                      className={`border-b ${isFee ? "bg-muted/40" : ""}`}
+                    >
                       <td className="p-2">{t.date.split("T")[0] ?? t.date}</td>
                     {filterCardId === "all" && (
                       <td className="p-2">
@@ -211,7 +243,10 @@ export default function TransactionsPage() {
                         </Select>
                       </td>
                     )}
-                      <td className="p-2">{OP_LABELS[t.operationType] ?? t.operationType}</td>
+                      <td className={`p-2 ${isFee ? "pl-8 text-muted-foreground" : ""}`}>
+                        {isFee && "↳ "}
+                        {OP_LABELS[t.operationType] ?? t.operationType}
+                      </td>
                       <td
                         className={`p-2 text-right ${
                           Number(t.amount) >= 0 ? "text-green-600" : "text-red-600"
@@ -233,11 +268,12 @@ export default function TransactionsPage() {
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
-            {sortedByDate.length === 0 && (
+            {displayRows.length === 0 && (
               <p className="text-center py-8 text-muted-foreground">
                 No hay transacciones. Importa desde una imagen o agrega manualmente.
               </p>
