@@ -32,7 +32,6 @@ interface RecargaRow {
   usd: number;
   ves: number;
   feeMerchant: number;
-  vesNeto: number;
   saldo: number;
 }
 
@@ -79,8 +78,8 @@ export default function VesUsadosPage() {
           const usd = Number(t.amount);
           const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
           const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
-          const vesNeto = Math.round((ves - feeMerchant) * 100) / 100;
-          saldoAcum += vesNeto;
+          // Ambas son negativas (salidas): -VES + (-Fee) = -(VES + Fee), se suman
+          saldoAcum += ves + feeMerchant;
           return {
             id: t.id,
             cardId: t.cardId,
@@ -88,7 +87,6 @@ export default function VesUsadosPage() {
             usd,
             ves,
             feeMerchant,
-            vesNeto,
             saldo: saldoAcum,
           };
         });
@@ -216,7 +214,7 @@ export default function VesUsadosPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Saldo total VES (neto, después de Fee Merchant 4%)</CardTitle>
+          <CardTitle>Total VES usados (VES + Fee Merchant 4%, acumulado)</CardTitle>
           <p className="text-2xl font-bold text-amber-600">
             -{totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
           </p>
