@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Upload, BarChart3 } from "lucide-react";
+import { CreditCard, Upload, BarChart3, Database } from "lucide-react";
 import { DashboardSummary } from "@/components/dashboard/DashboardSummary";
 
 export default function HomePage() {
@@ -16,7 +16,7 @@ export default function HomePage() {
 
       <DashboardSummary />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CreditCard className="h-8 w-8 text-primary" />
@@ -52,6 +52,19 @@ export default function HomePage() {
           <CardContent>
             <Button asChild variant="outline">
               <Link href="/transactions">Ver Transacciones</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Database className="h-8 w-8 text-primary" />
+            <CardTitle>Respaldo</CardTitle>
+            <CardDescription>Exporta o importa un respaldo completo de tus datos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/backup">Ir a Respaldo</Link>
             </Button>
           </CardContent>
         </Card>

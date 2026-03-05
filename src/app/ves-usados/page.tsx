@@ -114,8 +114,8 @@ export default function VesUsadosPage() {
         r.date.split("T")[0] ?? r.date,
         cardLabel,
         r.usd.toFixed(2),
-        r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
-        r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+        `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
       ];
     });
@@ -139,8 +139,8 @@ export default function VesUsadosPage() {
         r.date.split("T")[0] ?? r.date,
         cardLabel,
         r.usd.toFixed(2),
-        r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
-        r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+        `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
       ];
     });
@@ -265,8 +265,8 @@ export default function VesUsadosPage() {
                         <td className="p-3 border-b border-gray-200 text-right">
                           ${r.usd.toFixed(2)}
                         </td>
-                        <td className="p-3 border-b border-gray-200 text-right">
-                          {r.ves.toLocaleString("es-VE", {
+                        <td className="p-3 border-b border-gray-200 text-right text-amber-600">
+                          -{r.ves.toLocaleString("es-VE", {
                             minimumFractionDigits: 2,
                           })}
                         </td>
