@@ -66,6 +66,7 @@ function TransactionsContent() {
   const [filterTo, setFilterTo] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     cardId: "",
@@ -188,6 +189,32 @@ function TransactionsContent() {
     if (!confirm("¿Eliminar esta transacción?")) return;
     const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
     if (res.ok) refetchTransactions();
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayRows.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayRows.map((t) => t.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`¿Eliminar ${selectedIds.size} transacción(es) seleccionada(s)?`)) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map((id) => fetch(`/api/transactions/${id}`, { method: "DELETE" })));
+    setSelectedIds(new Set());
+    refetchTransactions();
   };
 
   const openAddDialog = () => {
@@ -385,10 +412,29 @@ function TransactionsContent() {
       ) : (
         <Card>
           <CardContent className="pt-6">
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-4 mb-4">
+                <Button variant="destructive" onClick={handleBulkDelete}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar {selectedIds.size} seleccionada(s)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSelectedIds(new Set())}>
+                  Deseleccionar todo
+                </Button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
+                    <th className="w-10 p-2">
+                      <input
+                        type="checkbox"
+                        checked={displayRows.length > 0 && selectedIds.size === displayRows.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </th>
                     <th className="text-left p-2">Fecha</th>
                     {filterCardId === "all" && (
                       <th className="text-left p-2">Tarjeta</th>
@@ -422,8 +468,16 @@ function TransactionsContent() {
                     return (
                     <tr
                       key={t.id}
-                      className={`border-b ${isFee ? "bg-muted/40" : ""}`}
+                      className={`border-b ${isFee ? "bg-muted/40" : ""} ${selectedIds.has(t.id) ? "bg-destructive/10" : ""}`}
                     >
+                      <td className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </td>
                       <td className="p-2">{t.date.split("T")[0] ?? t.date}</td>
                     {filterCardId === "all" && (
                       <td className="p-2">
