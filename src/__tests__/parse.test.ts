@@ -8,6 +8,10 @@ describe("parseAmount", () => {
   it("parses Spanish format 1.234,56", () => {
     expect(parseAmount("1.234,56")).toBe(1234.56);
   });
+  it("parses Spanish comma decimal without thousands (1234,56)", () => {
+    expect(parseAmount("1234,56")).toBe(1234.56);
+    expect(parseAmount("12345,67")).toBe(12345.67);
+  });
   it("parses plain number", () => {
     expect(parseAmount("100")).toBe(100);
   });

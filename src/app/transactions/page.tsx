@@ -94,13 +94,17 @@ export default function TransactionsPage() {
       parents.push(t);
     }
   }
-  // Preserve order: date asc, then createdAt (matches bank statement / import order)
-  parents.sort(
-    (a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime() ||
-      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime() ||
-      (a.id || "").localeCompare(b.id || "")
-  );
+  // Order: date asc, then within date: Recarga first, Procesada second, fees under each Procesada
+  parents.sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    if (dateA !== dateB) return dateA - dateB;
+    // Same date: RECARGA first (0), PROCESADA second (1)
+    const orderA = a.operationType === "RECARGA" ? 0 : 1;
+    const orderB = b.operationType === "RECARGA" ? 0 : 1;
+    if (orderA !== orderB) return orderA - orderB;
+    return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  });
   // Fee order: FEE_VZLA first, then FEE_MERCHANT (or by createdAt to preserve import order)
   Array.from(feesByParent.values()).forEach((arr) => {
     arr.sort((a, b) => {

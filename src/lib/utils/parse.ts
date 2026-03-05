@@ -7,26 +7,37 @@ export type OperationType = "RECARGA" | "PROCESADA" | "FEE_VZLA" | "FEE_MERCHANT
 
 /**
  * Parse Spanish-formatted amount to number.
- * Examples: "6.000,00" -> 6000, "1.234,56" -> 1234.56, "100" -> 100
+ * Examples: "6.000,00" -> 6000, "1.234,56" -> 1234.56, "1234,56" -> 1234.56, "100" -> 100
  */
 export function parseAmount(value: string | null | undefined): number | null {
   if (value == null || String(value).trim() === "") return null;
   const str = String(value).trim();
   // Remove currency symbols and spaces
   let cleaned = str.replace(/[$€\s]/g, "");
-  // Spanish: 1.234,56 or 6.000,00
+  // Handle negative (leading minus or parentheses)
+  const isNegative = cleaned.startsWith("-") || /^\([^)]+\)$/.test(cleaned);
+  if (isNegative) cleaned = cleaned.replace(/^[-()]|[)]$/g, "").trim();
+  // Spanish with thousands: 1.234,56 or 6.000,00
   if (/^\d{1,3}(\.\d{3})*(,\d{1,2})?$/.test(cleaned)) {
     cleaned = cleaned.replace(/\./g, "").replace(",", ".");
-    return parseFloat(cleaned) || null;
+    const n = parseFloat(cleaned) || null;
+    return n != null && isNegative ? -n : n;
+  }
+  // Spanish comma as decimal, no thousands: 1234,56 or 12345,67 (OCR often omits thousands dot)
+  if (/^\d+,\d{1,2}$/.test(cleaned)) {
+    const n = parseFloat(cleaned.replace(",", ".")) || null;
+    return n != null && isNegative ? -n : n;
   }
   // US format: 1,234.56
   if (/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/.test(cleaned)) {
     cleaned = cleaned.replace(/,/g, "");
-    return parseFloat(cleaned) || null;
+    const n = parseFloat(cleaned) || null;
+    return n != null && isNegative ? -n : n;
   }
-  // Plain number
+  // Plain number (no comma, or dot as decimal)
   const num = parseFloat(cleaned.replace(/[^\d.-]/g, ""));
-  return isNaN(num) ? null : num;
+  const result = isNaN(num) ? null : num;
+  return result != null && isNegative ? -result : result;
 }
 
 /**

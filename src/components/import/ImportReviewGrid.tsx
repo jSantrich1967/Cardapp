@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ParsedRow } from "@/lib/utils/ocr-parser";
-import { formatDateForDb } from "@/lib/utils/parse";
+import { formatDateForDb, parseAmount } from "@/lib/utils/parse";
 import { AlertTriangle } from "lucide-react";
 
 const OPERATION_TYPES = ["RECARGA", "PROCESADA", "FEE_VZLA", "FEE_MERCHANT"] as const;
@@ -196,7 +196,7 @@ export function ImportReviewGrid({
                       value={row.monto ?? ""}
                       onChange={(e) => {
                         const v = e.target.value;
-                        const n = v ? parseFloat(v.replace(",", ".")) : null;
+                        const n = v ? parseAmount(v) : null;
                         updateRow(row.id, { monto: n });
                       }}
                       className="h-8 text-xs text-right"
@@ -209,7 +209,7 @@ export function ImportReviewGrid({
                         value={row.saldo ?? ""}
                         onChange={(e) => {
                           const v = e.target.value;
-                          const n = v ? parseFloat(v.replace(",", ".")) : null;
+                          const n = v ? parseAmount(v) : null;
                           updateRow(row.id, { saldo: n });
                         }}
                         className="h-8 text-xs text-right"
