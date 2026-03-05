@@ -64,6 +64,7 @@ function TransactionsContent() {
   }, [searchParams]);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -91,6 +92,7 @@ function TransactionsContent() {
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
+    if (filterType && filterType !== "all") params.set("type", filterType);
     fetch(`/api/transactions?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
@@ -102,7 +104,7 @@ function TransactionsContent() {
     return () => {
       cancelled = true;
     };
-  }, [filterCardId, filterFrom, filterTo]);
+  }, [filterCardId, filterFrom, filterTo, filterType]);
 
   const filteredByCard =
     filterCardId && filterCardId !== "all"
@@ -162,6 +164,7 @@ function TransactionsContent() {
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
+    if (filterType && filterType !== "all") params.set("type", filterType);
     fetch(`/api/transactions?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => setTransactions(Array.isArray(data) ? data : []));
@@ -349,6 +352,21 @@ function TransactionsContent() {
                 value={filterTo}
                 onChange={(e) => setFilterTo(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Tipo</label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="RECARGA">Recarga</SelectItem>
+                  <SelectItem value="PROCESADA">Procesada</SelectItem>
+                  <SelectItem value="FEE_VZLA">Fee Vzla</SelectItem>
+                  <SelectItem value="FEE_MERCHANT">Fee Merchant</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
