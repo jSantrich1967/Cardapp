@@ -36,8 +36,8 @@ export async function POST(request: Request) {
     console.error(e);
     const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
     let hint = "Revisa la consola del servidor para más detalles.";
-    if (!process.env.DATABASE_URL) {
-      hint = "DATABASE_URL no está configurado. Crea .env.local con la URL de Supabase.";
+    if (!process.env.DATABASE_URL && !process.env.POSTGRES_URL) {
+      hint = "No hay base de datos. Añade una desde Vercel: Storage → Create Database → Postgres (Neon).";
     } else if (msg.includes("connect") || msg.includes("connection") || msg.includes("econnrefused") || msg.includes("enotfound")) {
       hint = "No se puede conectar a la base de datos. Verifica DATABASE_URL y que Supabase esté accesible.";
     } else if (msg.includes("password") || msg.includes("authentication") || msg.includes("28p01")) {

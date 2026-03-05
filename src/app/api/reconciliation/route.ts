@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 import { transactions } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { computeRunningBalance } from "@/lib/utils/balance";
