@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, Upload, List, BarChart3, FileCheck } from "lucide-react";
+import { CreditCard, Upload, List, BarChart3, FileCheck, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/transactions", label: "Transacciones", icon: List },
   { href: "/reports", label: "Reportes", icon: BarChart3 },
   { href: "/reconciliation", label: "Reconciliación", icon: FileCheck },
+  { href: "/ves-usados", label: "VES Usados", icon: DollarSign },
 ];
 
 export function Nav() {
