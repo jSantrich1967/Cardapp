@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getCurrentBalance } from "@/lib/utils/balance";
+import { getCurrentBalance, computeRunningBalance } from "@/lib/utils/balance";
 import { Pencil, Trash2 } from "lucide-react";
 
 interface CardItem {
@@ -74,11 +74,16 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [filterCardId, filterFrom, filterTo]);
 
-  const balance = getCurrentBalance(transactions);
   const filteredByCard =
     filterCardId && filterCardId !== "all"
       ? transactions.filter((t) => t.cardId === filterCardId)
       : transactions;
+
+  const sortedByDate = [...filteredByCard].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const balanceByTx = computeRunningBalance(sortedByDate);
+  const balance = getCurrentBalance(filteredByCard);
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta transacción?")) return;
@@ -153,14 +158,14 @@ export default function TransactionsPage() {
                     <th className="text-left p-2">Fecha</th>
                     <th className="text-left p-2">Tipo</th>
                     <th className="text-right p-2">Monto</th>
-                    <th className="text-left p-2">Notas</th>
+                    <th className="text-right p-2">Saldo</th>
                     <th className="w-20" />
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredByCard.map((t) => (
+                  {sortedByDate.map((t) => (
                     <tr key={t.id} className="border-b">
-                      <td className="p-2">{t.date}</td>
+                      <td className="p-2">{t.date.split("T")[0] ?? t.date}</td>
                       <td className="p-2">{OP_LABELS[t.operationType] ?? t.operationType}</td>
                       <td
                         className={`p-2 text-right ${
@@ -170,7 +175,9 @@ export default function TransactionsPage() {
                         {Number(t.amount) >= 0 ? "+" : ""}
                         ${Math.abs(Number(t.amount)).toFixed(2)}
                       </td>
-                      <td className="p-2 text-muted-foreground">{t.notes || "-"}</td>
+                      <td className="p-2 text-right font-medium">
+                        ${(balanceByTx.get(t.id) ?? 0).toFixed(2)}
+                      </td>
                       <td className="p-2">
                         <Button
                           variant="ghost"
@@ -185,7 +192,7 @@ export default function TransactionsPage() {
                 </tbody>
               </table>
             </div>
-            {filteredByCard.length === 0 && (
+            {sortedByDate.length === 0 && (
               <p className="text-center py-8 text-muted-foreground">
                 No hay transacciones. Importa desde una imagen o agrega manualmente.
               </p>
