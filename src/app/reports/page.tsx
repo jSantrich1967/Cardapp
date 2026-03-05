@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,9 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface CardItem {
   id: string;
@@ -61,9 +64,31 @@ export default function ReportsPage() {
   const [cards, setCards] = useState<CardItem[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [cardId, setCardId] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+
+  const fetchReport = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams();
+    if (cardId && cardId !== "all") params.set("cardId", cardId);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    fetch(`/api/reports?${params}`)
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.error || "Error al cargar reportes");
+        if (!data?.summary) throw new Error("Respuesta inválida del servidor");
+        setReport(data);
+      })
+      .catch((err) => {
+        setReport(null);
+        setError(err instanceof Error ? err.message : "Error de conexión. Verifica que la base de datos esté configurada.");
+      })
+      .finally(() => setLoading(false));
+  }, [cardId, from, to]);
 
   useEffect(() => {
     fetch("/api/cards")
@@ -72,45 +97,109 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (cardId && cardId !== "all") params.set("cardId", cardId);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    fetch(`/api/reports?${params}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setReport(data?.summary ? data : null);
-      })
-      .catch(() => setReport(null))
-      .finally(() => setLoading(false));
-  }, [cardId, from, to]);
+    fetchReport();
+  }, [fetchReport]);
 
-  const exportCsv = async () => {
-    const params = new URLSearchParams();
-    if (cardId && cardId !== "all") params.set("cardId", cardId);
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-    const res = await fetch(`/api/transactions?${params}`);
-    const data = await res.json();
-    const list = Array.isArray(data) ? data : [];
-    const headers = ["Fecha", "Tipo", "Monto", "Notas"];
-    const rows = list.map(
-      (t: { date?: string; operationType?: string; amount?: string; notes?: string | null }) =>
-        [(t.date ?? ""), (t.operationType ?? ""), (t.amount ?? ""), (t.notes ?? "")].join(",")
-    );
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `cardops-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportExcel = () => {
+    if (!report) return;
+    const wb = XLSX.utils.book_new();
+    const summaryData = [
+      ["Resumen", ""],
+      ["Saldo", (report.summary.balance ?? 0).toFixed(2)],
+      ["Total Recarga", (report.summary.recarga ?? 0).toFixed(2)],
+      ["Total Procesada", (report.summary.procesada ?? 0).toFixed(2)],
+      ["Fee Vzla", (report.summary.feeVzla ?? 0).toFixed(2)],
+      ["Fee Merchant", (report.summary.feeMerchant ?? 0).toFixed(2)],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Resumen");
+    const monthlyData = [
+      ["Mes", "Recarga", "Procesada", "Fee Vzla", "Fee Merchant"],
+      ...(report.monthly ?? []).map((m) => [m.month, m.recarga, m.procesada, m.feeVzla, m.feeMerchant]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(monthlyData), "Por mes");
+    const byCardData = [
+      ["Tarjeta", "Últimos 4", "Saldo", "Transacciones"],
+      ...(report.byCard ?? []).map((c) => [c.cardholderName, c.last4, c.balance, c.txCount]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(byCardData), "Por tarjeta");
+    XLSX.writeFile(wb, `reportes-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  if (loading || !report?.summary) {
-    return <p className="text-muted-foreground">{loading ? "Cargando..." : "No hay datos para mostrar."}</p>;
+  const exportPdf = () => {
+    if (!report) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Reportes CardOps", 14, 22);
+    doc.setFontSize(11);
+    doc.text(`Generado: ${new Date().toLocaleDateString("es")}`, 14, 30);
+
+    const summary = report.summary;
+    autoTable(doc, {
+      startY: 38,
+      head: [["Concepto", "Monto"]],
+      body: [
+        ["Saldo", `$${(summary.balance ?? 0).toFixed(2)}`],
+        ["Total Recarga", `$${(summary.recarga ?? 0).toFixed(2)}`],
+        ["Total Procesada", `$${(summary.procesada ?? 0).toFixed(2)}`],
+        ["Fee Vzla", `$${(summary.feeVzla ?? 0).toFixed(2)}`],
+        ["Fee Merchant", `$${(summary.feeMerchant ?? 0).toFixed(2)}`],
+      ],
+    });
+
+    const docAny = doc as jsPDF & { lastAutoTable?: { finalY: number } };
+    let finalY = docAny.lastAutoTable?.finalY ?? 50;
+    if ((report.monthly ?? []).length > 0) {
+      doc.text("Gastos por mes", 14, finalY + 15);
+      autoTable(doc, {
+        startY: finalY + 20,
+        head: [["Mes", "Recarga", "Procesada", "Fee Vzla", "Fee Merchant"]],
+        body: (report.monthly ?? []).map((m) => [String(m.month), String(m.recarga), String(m.procesada), String(m.feeVzla), String(m.feeMerchant)]),
+      });
+      finalY = docAny.lastAutoTable?.finalY ?? finalY;
+    }
+
+    if ((report.byCard ?? []).length > 0) {
+      doc.text("Saldo por tarjeta", 14, finalY + 15);
+      autoTable(doc, {
+        startY: finalY + 20,
+        head: [["Tarjeta", "Últimos 4", "Saldo", "Transacciones"]],
+        body: (report.byCard ?? []).map((c) => [c.cardholderName, c.last4, c.balance.toFixed(2), String(c.txCount)]),
+      });
+    }
+
+    doc.save(`reportes-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
+  if (loading && !report) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Reportes</h1>
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (error && !report) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Reportes</h1>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive mb-4">{error}</p>
+            <Button onClick={fetchReport}>Reintentar</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!report?.summary) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Reportes</h1>
+        <p className="text-muted-foreground">No hay datos para mostrar. Importa transacciones o verifica los filtros.</p>
+      </div>
+    );
   }
 
   const summary = report.summary;
@@ -125,7 +214,14 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Reportes</h1>
-        <Button onClick={exportCsv}>Exportar CSV</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel}>
+            Exportar Excel
+          </Button>
+          <Button variant="outline" onClick={exportPdf}>
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
       <Card>
