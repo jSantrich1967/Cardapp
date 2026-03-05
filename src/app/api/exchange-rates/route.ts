@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, ensureExchangeRatesTable } from "@/lib/db";
 import { exchangeRates } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
@@ -7,10 +7,22 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET: Lista todos los tipos de cambio de mercado por fecha.
+ * Crea la tabla automáticamente si no existe.
  */
 export async function GET() {
   try {
-    const result = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+    let result;
+    try {
+      result = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      if (msg.includes("does not exist") || msg.includes("relation")) {
+        await ensureExchangeRatesTable();
+        result = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+      } else {
+        throw err;
+      }
+    }
     const map: Record<string, number> = {};
     result.forEach((r) => {
       map[r.date] = Number(r.rate);
@@ -31,6 +43,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    await ensureExchangeRatesTable();
     const body = await request.json();
     const { date, rate } = body;
 

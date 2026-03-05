@@ -51,7 +51,14 @@ export default function ResultadosPage() {
   useEffect(() => {
     fetch("/api/exchange-rates")
       .then((r) => r.json())
-      .then((data) => setExchangeRates(typeof data === "object" ? data : {}));
+      .then((data) => {
+        if (data && typeof data === "object" && !("error" in data)) {
+          setExchangeRates(data);
+        } else {
+          setExchangeRates({});
+        }
+      })
+      .catch(() => setExchangeRates({}));
   }, []);
 
   useEffect(() => {
