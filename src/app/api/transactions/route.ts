@@ -8,13 +8,13 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const cardId = searchParams.get("cardId");
+    const cardId = searchParams.get("cardId")?.trim() || null;
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const type = searchParams.get("type");
 
     const conditions = [];
-    if (cardId) conditions.push(eq(transactions.cardId, cardId));
+    if (cardId && cardId !== "all") conditions.push(eq(transactions.cardId, cardId));
     if (from) conditions.push(gte(transactions.date, from));
     if (to) conditions.push(lte(transactions.date, to));
     if (type) conditions.push(eq(transactions.operationType, type as any));

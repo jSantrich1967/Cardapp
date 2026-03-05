@@ -51,29 +51,33 @@ export default function TransactionsPage() {
       .then((data) => setCards(Array.isArray(data) ? data : []));
   };
 
-  const fetchTransactions = () => {
-    const params = new URLSearchParams();
-    if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
-    if (filterFrom) params.set("from", filterFrom);
-    if (filterTo) params.set("to", filterTo);
-    fetch(`/api/transactions?${params}`)
-      .then((r) => r.json())
-      .then((data) => setTransactions(Array.isArray(data) ? data : []))
-      .finally(() => setLoading(false));
-  };
-
   useEffect(() => {
     fetchCards();
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    fetchTransactions();
+    const params = new URLSearchParams();
+    if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
+    if (filterFrom) params.set("from", filterFrom);
+    if (filterTo) params.set("to", filterTo);
+    fetch(`/api/transactions?${params}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setTransactions(Array.isArray(data) ? data : []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [filterCardId, filterFrom, filterTo]);
 
   const filteredByCard =
     filterCardId && filterCardId !== "all"
-      ? transactions.filter((t) => t.cardId === filterCardId)
+      ? transactions.filter((t) => String(t.cardId).trim() === String(filterCardId).trim())
       : transactions;
 
   const sortedByDate = [...filteredByCard].sort(
@@ -90,7 +94,15 @@ export default function TransactionsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta transacción?")) return;
     const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
-    if (res.ok) fetchTransactions();
+    if (res.ok) {
+      const params = new URLSearchParams();
+      if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
+      if (filterFrom) params.set("from", filterFrom);
+      if (filterTo) params.set("to", filterTo);
+      const r = await fetch(`/api/transactions?${params}`, { cache: "no-store" });
+      const data = await r.json();
+      setTransactions(Array.isArray(data) ? data : []);
+    }
   };
 
   return (
