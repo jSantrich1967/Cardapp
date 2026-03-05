@@ -94,11 +94,13 @@ export default function TransactionsPage() {
       parents.push(t);
     }
   }
-  // Order: date asc, then within date: Recarga first, Procesada second, fees under each Procesada
+  // Order: date asc (strict chronological - day 25 before day 26), then within date: Recarga, Procesada, fees
+  const toDateStr = (d: string) => String(d).split("T")[0] ?? d;
   parents.sort((a, b) => {
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
-    if (dateA !== dateB) return dateA - dateB;
+    const dateStrA = toDateStr(a.date);
+    const dateStrB = toDateStr(b.date);
+    const dateCmp = dateStrA.localeCompare(dateStrB);
+    if (dateCmp !== 0) return dateCmp; // Strict date order: 25 before 26
     // Same date: RECARGA first (0), PROCESADA second (1)
     const orderA = a.operationType === "RECARGA" ? 0 : 1;
     const orderB = b.operationType === "RECARGA" ? 0 : 1;
