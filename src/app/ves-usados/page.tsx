@@ -116,7 +116,7 @@ export default function VesUsadosPage() {
         r.usd.toFixed(2),
         `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
-        r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        `-${r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
       ];
     });
     const wb = XLSX.utils.book_new();
@@ -141,7 +141,7 @@ export default function VesUsadosPage() {
         r.usd.toFixed(2),
         `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
-        r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+        `-${r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
       ];
     });
 
@@ -217,8 +217,8 @@ export default function VesUsadosPage() {
       <Card>
         <CardHeader>
           <CardTitle>Saldo total VES (neto, después de Fee Merchant 4%)</CardTitle>
-          <p className="text-2xl font-bold text-primary">
-            {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+          <p className="text-2xl font-bold text-amber-600">
+            -{totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
           </p>
         </CardHeader>
       </Card>
@@ -275,8 +275,8 @@ export default function VesUsadosPage() {
                             minimumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="p-3 border-b border-gray-200 text-right font-medium">
-                          {r.saldo.toLocaleString("es-VE", {
+                        <td className="p-3 border-b border-gray-200 text-right font-medium text-amber-600">
+                          -{r.saldo.toLocaleString("es-VE", {
                             minimumFractionDigits: 2,
                           })}
                         </td>
