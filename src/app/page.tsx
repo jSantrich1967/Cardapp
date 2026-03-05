@@ -1,0 +1,61 @@
+import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CreditCard, Upload, BarChart3 } from "lucide-react";
+import { DashboardSummary } from "@/components/dashboard/DashboardSummary";
+
+export default function HomePage() {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">CardOps</h1>
+        <p className="text-muted-foreground mt-1">
+          Gestiona tus tarjetas de crédito, importa transacciones desde imágenes y calcula saldos automáticamente.
+        </p>
+      </div>
+
+      <DashboardSummary />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CreditCard className="h-8 w-8 text-primary" />
+            <CardTitle>Tarjetas</CardTitle>
+            <CardDescription>Administra tus tarjetas (nombre + últimos 4 dígitos)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/cards">Ir a Tarjetas</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Upload className="h-8 w-8 text-primary" />
+            <CardTitle>Importar</CardTitle>
+            <CardDescription>Sube una imagen de tu tabla Excel para extraer transacciones con OCR</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/import">Importar Imagen</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <BarChart3 className="h-8 w-8 text-primary" />
+            <CardTitle>Reportes</CardTitle>
+            <CardDescription>Dashboard, gráficos y exportación a CSV/XLSX</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/reports">Ver Reportes</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
