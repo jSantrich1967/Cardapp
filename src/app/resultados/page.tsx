@@ -105,25 +105,39 @@ export default function ResultadosPage() {
     usdRecibidos += procesadaAmount - feeVzla - feeMerchant;
   });
 
-  // VES usados: recarga × 515 + fee 4%. USD equivalente = (VES + fee) / tipo_cambio_mercado_fecha
-  const recargas = transactions.filter(
-    (t) => t.operationType === "RECARGA" && Number(t.amount) > 0
+  // VES usados solo de Procesadas y Fees (no Recargas)
+  // Procesadas: monto × 515 + fee 4%, ÷ tasa mercado = USD
+  // Fees: |monto| × 515 (VES equiv del fee), ÷ tasa mercado = USD
+  const fees = transactions.filter(
+    (t) => t.operationType === "FEE_VZLA" || t.operationType === "FEE_MERCHANT"
   );
 
   let usdGastadoVes = 0;
-  recargas.forEach((r) => {
-    const dateStr = r.date.split("T")[0] ?? r.date;
-    const usd = Number(r.amount);
+  procesadas.forEach((p) => {
+    const dateStr = p.date.split("T")[0] ?? p.date;
+    const usd = Math.abs(Number(p.amount));
     const ves = Math.round(usd * TIPO_CAMBIO_RECARGA * 100) / 100;
     const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
     const totalVes = ves + feeMerchant;
     const tasaMercado = exchangeRates[dateStr];
     usdGastadoVes += totalVes / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
   });
+  fees.forEach((f) => {
+    const dateStr = f.date.split("T")[0] ?? f.date;
+    const feeUsd = Math.abs(Number(f.amount));
+    const vesEquiv = Math.round(feeUsd * TIPO_CAMBIO_RECARGA * 100) / 100;
+    const tasaMercado = exchangeRates[dateStr];
+    usdGastadoVes += vesEquiv / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
+  });
 
   const ganancia = usdRecibidos - usdGastadoVes;
 
-  const fechasRecargas = [...new Set(recargas.map((r) => (r.date.split("T")[0] ?? r.date)))].sort();
+  const fechasParaTasa = [
+    ...new Set([
+      ...procesadas.map((p) => p.date.split("T")[0] ?? p.date),
+      ...fees.map((f) => f.date.split("T")[0] ?? f.date),
+    ]),
+  ].sort();
 
   const handleAddRate = async () => {
     if (!newRateDate || !newRateValue) return;
@@ -146,7 +160,7 @@ export default function ResultadosPage() {
       <div>
         <h1 className="text-2xl font-bold">Resultados</h1>
         <p className="text-muted-foreground">
-          Comparación: USD recibidos (Procesada - fees) vs VES usados (recarga × 515 + fee 4%) ÷ tipo cambio mercado.
+          Comparación: USD recibidos (Procesada - fees) vs VES usados de Procesadas y Fees (× 515 + fee 4%) ÷ tipo cambio mercado.
           Ganancia = USD recibidos - USD gastado.
         </p>
       </div>
@@ -195,7 +209,7 @@ export default function ResultadosPage() {
         <CardHeader>
           <CardTitle>Tipo de cambio de mercado por fecha</CardTitle>
           <CardDescription>
-            Para cada recarga: (VES + fee) ÷ tasa del día = USD. Sin tasa guardada se usa 515.
+            Para Procesadas y Fees: (VES + fee) ÷ tasa del día = USD. Sin tasa guardada se usa 515.
           </CardDescription>
           <div className="flex flex-wrap gap-4 items-end">
             <div>
@@ -224,11 +238,11 @@ export default function ResultadosPage() {
               Guardar
             </Button>
           </div>
-          {fechasRecargas.length > 0 && (
+          {fechasParaTasa.length > 0 && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-muted-foreground mb-2">Fechas con recargas:</p>
+              <p className="text-sm text-muted-foreground mb-2">Fechas con Procesadas/Fees:</p>
               <div className="flex flex-wrap gap-2">
-                {fechasRecargas.map((f) => (
+                {fechasParaTasa.map((f) => (
                   <span
                     key={f}
                     className={`text-sm px-2 py-1 rounded ${
@@ -267,7 +281,7 @@ export default function ResultadosPage() {
               <CardHeader>
                 <CardTitle className="text-sm">USD gastado (VES usados)</CardTitle>
                 <CardDescription>
-                  (VES + Fee 4%) ÷ tipo cambio mercado (por fecha)
+                  VES usados (Procesadas + Fees) ÷ tipo cambio mercado (por fecha)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -310,11 +324,11 @@ export default function ResultadosPage() {
                   <span className="font-medium text-foreground">
                     ${usdRecibidos.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </span>{" "}
-                  netos (Procesada menos fees). Para las recargas has usado VES equivalentes a{" "}
+                  netos (Procesada menos fees). VES usados (Procesadas + Fees) equivalentes a{" "}
                   <span className="font-medium text-foreground">
                     ${usdGastadoVes.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </span>{" "}
-                  (cada recarga: USD × 515 = VES, + 4% fee, ÷ tasa mercado fecha = USD).
+                  (Procesada: USD × 515 + 4% fee; Fees: USD × 515; ÷ tasa mercado fecha = USD).
                   Ganancia:{" "}
                   <span
                     className={`font-bold ${ganancia >= 0 ? "text-green-600" : "text-red-600"}`}
