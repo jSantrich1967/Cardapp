@@ -1,6 +1,9 @@
 /**
  * Compute running balance per card from transactions in chronological order.
- * RECARGA increases, PROCESADA/FEEs decrease.
+ *
+ * CONVENCIÓN DE SIGNOS:
+ * - RECARGA: monto positivo → suma al saldo
+ * - PROCESADA, FEE_VZLA, FEE_MERCHANT: monto negativo → resta del saldo
  */
 
 import type { OperationType } from "./parse";

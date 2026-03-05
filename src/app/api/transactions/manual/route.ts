@@ -7,6 +7,7 @@ type OperationType = "RECARGA" | "PROCESADA" | "FEE_VZLA" | "FEE_MERCHANT";
 
 /**
  * Create a manual transaction. For PROCESADA, auto-generates fee transactions.
+ * Sign convention: RECARGA = positive (sums), PROCESADA/FEEs = negative (subtracts).
  */
 export async function POST(request: Request) {
   try {

@@ -98,7 +98,7 @@ export async function POST(
         );
       }
 
-      // Sign convention: RECARGA = positive, PROCESADA/FEEs = negative
+      // Sign convention: RECARGA suma (positivo), PROCESADA y fees restan (negativo)
       const signedAmount =
         operationType === "RECARGA" ? monto : -Math.abs(monto);
 
