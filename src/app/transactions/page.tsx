@@ -353,21 +353,6 @@ function TransactionsContent() {
                 onChange={(e) => setFilterTo(e.target.value)}
               />
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground">Tipo</label>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="RECARGA">Recarga</SelectItem>
-                  <SelectItem value="PROCESADA">Procesada</SelectItem>
-                  <SelectItem value="FEE_VZLA">Fee Vzla</SelectItem>
-                  <SelectItem value="FEE_MERCHANT">Fee Merchant</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardHeader>
       </Card>
@@ -394,7 +379,23 @@ function TransactionsContent() {
                     {filterCardId === "all" && (
                       <th className="text-left p-2">Tarjeta</th>
                     )}
-                    <th className="text-left p-2">Tipo</th>
+                    <th className="text-left p-2">
+                      <div className="flex flex-col gap-1">
+                        <span>Tipo</span>
+                        <Select value={filterType} onValueChange={setFilterType}>
+                          <SelectTrigger className="h-8 text-xs w-full min-w-[120px]">
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="RECARGA">Recarga</SelectItem>
+                            <SelectItem value="PROCESADA">Procesada</SelectItem>
+                            <SelectItem value="FEE_VZLA">Fee Vzla</SelectItem>
+                            <SelectItem value="FEE_MERCHANT">Fee Merchant</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </th>
                     <th className="text-right p-2">Monto</th>
                     <th className="text-right p-2">Saldo</th>
                     <th className="w-20" />
