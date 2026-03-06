@@ -14,8 +14,13 @@ const connectionString =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL!;
 
-// For query purposes
-const client = postgres(connectionString, { prepare: false });
+// For query purposes - connect_timeout y ssl para Supabase
+const client = postgres(connectionString, {
+  prepare: false,
+  connect_timeout: 30,
+  max: 10,
+  ssl: "require",
+});
 
 export const db = drizzle(client, { schema });
 

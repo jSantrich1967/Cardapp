@@ -4,6 +4,7 @@ import { cards, transactions, exchangeRates } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Import puede tardar con muchos registros
 
 export interface BackupData {
   version: 1;
