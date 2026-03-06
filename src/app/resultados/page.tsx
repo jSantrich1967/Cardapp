@@ -11,13 +11,15 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getCached, setCache } from "@/lib/cache";
 import { normalizeDateKey, normalizeRatesMap } from "@/lib/utils/date-keys";
 
 const TIPO_CAMBIO_RECARGA = 515; // Para calcular VES: USD × 515
 const FEE_MERCHANT_PCT = 0.04; // 4% por recarga en bolívares
 const STORAGE_KEY = "cardops_exchange_rates";
+const FETCH_TIMEOUT_MS = 15000; // 15 segundos - evita carga infinita si el API no responde
 
 function loadRatesFromStorage(): Record<string, number> {
   if (typeof window === "undefined") return {};
@@ -53,11 +55,14 @@ export default function ResultadosPage() {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
   // Datos de Resultados: cards + transactions
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     const params = new URLSearchParams();
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
@@ -71,13 +76,22 @@ export default function ResultadosPage() {
     } else {
       setLoading(true);
     }
-    fetch(`/api/resultados?${params}`, { cache: "no-store" })
-      .then((r) => r.json())
+
+    // Timeout para evitar carga infinita si el API no responde
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    fetch(`/api/resultados?${params}`, { cache: "no-store", signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Error ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (cancelled) return;
         if (data?.error) {
           setCards([]);
           setTransactions([]);
+          setError(data.error || "Error al cargar datos");
           return;
         }
         const cardsData = Array.isArray(data?.cards) ? data.cards : [];
@@ -86,19 +100,29 @@ export default function ResultadosPage() {
         setTransactions(txData);
         setCache(cacheKey, { cards: cardsData, transactions: txData });
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
-          setCards([]);
-          setTransactions([]);
+          // Solo mostrar error si no teníamos caché (evita sobrescribir datos buenos)
+          if (!cached) {
+            setCards([]);
+            setTransactions([]);
+            setError(
+              err.name === "AbortError"
+                ? "La solicitud tardó demasiado. Verifica tu conexión o la base de datos."
+                : "No se pudieron cargar los resultados. Intenta de nuevo."
+            );
+          }
         }
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [filterCardId, filterFrom, filterTo]);
+  }, [filterCardId, filterFrom, filterTo, retryCount]);
 
   // Tasas: desde Histórico de tasas (mismo endpoint + localStorage)
   const refreshRates = () => {
@@ -277,6 +301,23 @@ export default function ResultadosPage() {
 
       {loading ? (
         <p className="text-muted-foreground">Cargando...</p>
+      ) : error ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive font-medium">{error}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Revisa que la base de datos esté configurada en .env.local y que el servidor esté corriendo.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">

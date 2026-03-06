@@ -36,7 +36,11 @@ export default function TasasPage() {
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newRateDate, setNewRateDate] = useState("");
+  // Fecha por defecto: hoy (evita seleccionar año equivocado, ej. 2025 en vez de 2026)
+  const [newRateDate, setNewRateDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
   const [newRateValue, setNewRateValue] = useState("");
   const [rateSaving, setRateSaving] = useState(false);
   const [rateError, setRateError] = useState<string | null>(null);
@@ -202,7 +206,10 @@ export default function TasasPage() {
                 <tbody>
                   {sortedRates.map(({ date, rate }) => (
                     <tr key={date} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-3 px-4">{formatDate(date)}</td>
+                      <td className="py-3 px-4">
+                        {formatDate(date)}
+                        <span className="text-muted-foreground text-xs ml-2">({date})</span>
+                      </td>
                       <td className="text-right py-3 px-4 font-mono font-medium">
                         {Number(rate).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
                       </td>
