@@ -31,7 +31,8 @@ export async function GET(request: Request) {
 
     const ratesMap: Record<string, number> = {};
     ratesList.forEach((r) => {
-      ratesMap[r.date] = Number(r.rate);
+      const key = r.date ? (typeof r.date === 'string' ? r.date.split('T')[0] : new Date(r.date).toISOString().split('T')[0]) : '';
+      if (key) ratesMap[key] = Number(r.rate);
     });
 
     return NextResponse.json({

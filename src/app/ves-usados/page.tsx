@@ -73,6 +73,7 @@ export default function VesUsadosPage() {
   const [filterTo, setFilterTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function VesUsadosPage() {
       setCards(cached.cards ?? []);
       const txList = Array.isArray(cached.transactions) ? cached.transactions : [];
       const rates = cached.exchangeRates || {};
+      setExchangeRates(rates);
       const recargas = txList.filter(isRecarga)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       let saldoAcum = 0;
@@ -130,6 +132,7 @@ export default function VesUsadosPage() {
         const txList: TxItem[] = Array.isArray(data?.transactions) ? data.transactions : [];
         const rates = data?.exchangeRates || {};
         setCards(cardsData);
+        setExchangeRates(rates);
         setCache(cacheKey, { cards: cardsData, transactions: txList, exchangeRates: rates });
         const recargas = txList.filter(isRecarga)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -356,13 +359,11 @@ export default function VesUsadosPage() {
                             minimumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="p-3 border-b border-gray-200 text-right text-amber-600">
-                          -{r.feeMerchant.toLocaleString("es-VE", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
                         <td className="p-3 border-b border-gray-200 text-right text-emerald-600 font-bold">
                           -${r.feeUsdMercado.toFixed(2)}
+                          <div className="text-[10px] text-muted-foreground font-normal">
+                            (tasa: {exchangeRates[normalizeDateKey(r.date)] ? exchangeRates[normalizeDateKey(r.date)] : "515*"})
+                          </div>
                         </td>
                         <td className="p-3 border-b border-gray-200 text-right font-medium text-amber-600">
                           -{r.saldo.toLocaleString("es-VE", {
