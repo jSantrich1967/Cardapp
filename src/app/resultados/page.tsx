@@ -68,10 +68,14 @@ export default function ResultadosPage() {
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
     const cacheKey = `resultados_${params.toString()}`;
-    const cached = getCached<{ cards: CardItem[]; transactions: Transaction[] }>(cacheKey);
+    const cached = getCached<{ cards: CardItem[]; transactions: Transaction[]; exchangeRates?: Record<string, number> }>(cacheKey);
     if (cached) {
       setCards(cached.cards ?? []);
       setTransactions(cached.transactions ?? []);
+      if (cached.exchangeRates) {
+        const merged = normalizeRatesMap({ ...cached.exchangeRates, ...loadRatesFromStorage() });
+        setExchangeRates(merged);
+      }
       setLoading(false);
     } else {
       setLoading(true);
@@ -96,9 +100,12 @@ export default function ResultadosPage() {
         }
         const cardsData = Array.isArray(data?.cards) ? data.cards : [];
         const txData = Array.isArray(data?.transactions) ? data.transactions : [];
+        const apiRates = data?.exchangeRates && typeof data.exchangeRates === "object" ? data.exchangeRates : {};
         setCards(cardsData);
         setTransactions(txData);
-        setCache(cacheKey, { cards: cardsData, transactions: txData });
+        const mergedRates = normalizeRatesMap({ ...apiRates, ...loadRatesFromStorage() });
+        setExchangeRates(mergedRates);
+        setCache(cacheKey, { cards: cardsData, transactions: txData, exchangeRates: mergedRates });
       })
       .catch((err) => {
         if (!cancelled) {
