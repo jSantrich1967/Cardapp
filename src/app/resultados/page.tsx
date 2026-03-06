@@ -212,21 +212,14 @@ export default function ResultadosPage() {
   );
 
   let usdGastadoVes = 0;
-  procesadas.forEach((p) => {
-    const dateStr = normalizeDateKey(p.date);
-    const usd = Math.abs(Number(p.amount));
-    const ves = Math.round(usd * TIPO_CAMBIO_RECARGA * 100) / 100;
-    const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
-    const totalVes = ves + feeMerchant;
-    const tasaMercado = exchangeRates[dateStr];
-    usdGastadoVes += totalVes / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
-  });
-  fees.forEach((f) => {
-    const dateStr = normalizeDateKey(f.date);
-    const feeUsd = Math.abs(Number(f.amount));
-    const vesEquiv = Math.round(feeUsd * TIPO_CAMBIO_RECARGA * 100) / 100;
-    const tasaMercado = exchangeRates[dateStr];
-    usdGastadoVes += vesEquiv / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
+  transactions.forEach((t) => {
+    if (t.operationType === "PROCESADA" || t.operationType === "FEE_VZLA" || t.operationType === "FEE_MERCHANT") {
+      const dateStr = normalizeDateKey(t.date);
+      const amountUsd = Math.abs(Number(t.amount));
+      const vesEquiv = Math.round(amountUsd * TIPO_CAMBIO_RECARGA * 100) / 100;
+      const tasaMercado = exchangeRates[dateStr];
+      usdGastadoVes += vesEquiv / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
+    }
   });
 
   const ganancia = usdRecibidos - usdGastadoVes;
@@ -312,11 +305,10 @@ export default function ResultadosPage() {
                 {fechasParaTasa.map((f) => (
                   <span
                     key={f}
-                    className={`text-sm px-2 py-1 rounded ${
-                      exchangeRates[f]
+                    className={`text-sm px-2 py-1 rounded ${exchangeRates[f]
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800"
-                    }`}
+                      }`}
                     title="Formato YYYY-MM-DD (igual que en Histórico de tasas)"
                   >
                     {f}: {exchangeRates[f] ?? "sin tasa (usa 515)"}
@@ -390,9 +382,8 @@ export default function ResultadosPage() {
               </CardHeader>
               <CardContent>
                 <p
-                  className={`text-2xl font-bold ${
-                    ganancia >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
+                  className={`text-2xl font-bold ${ganancia >= 0 ? "text-green-600" : "text-red-600"
+                    }`}
                 >
                   ${ganancia.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
@@ -408,24 +399,24 @@ export default function ResultadosPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-                <p className="text-muted-foreground text-sm">
-                  Has recibido{" "}
-                  <span className="font-medium text-foreground">
-                    ${usdRecibidos.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </span>{" "}
-                  netos (Procesada menos fees). VES usados (Procesadas + Fees) equivalentes a{" "}
-                  <span className="font-medium text-foreground">
-                    ${usdGastadoVes.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </span>{" "}
-                  (Procesada: USD × 515 + 4% fee; Fees: USD × 515; ÷ tasa mercado fecha = USD).
-                  Ganancia:{" "}
-                  <span
-                    className={`font-bold ${ganancia >= 0 ? "text-green-600" : "text-red-600"}`}
-                  >
-                    ${ganancia.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </span>
-                  .
-                </p>
+              <p className="text-muted-foreground text-sm">
+                Has recibido{" "}
+                <span className="font-medium text-foreground">
+                  ${usdRecibidos.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>{" "}
+                netos (Procesada menos fees). VES usados (Procesadas + Fees) equivalentes a{" "}
+                <span className="font-medium text-foreground">
+                  ${usdGastadoVes.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>{" "}
+                (Procesada: USD × 515 + 4% fee; Fees: USD × 515; ÷ tasa mercado fecha = USD).
+                Ganancia:{" "}
+                <span
+                  className={`font-bold ${ganancia >= 0 ? "text-green-600" : "text-red-600"}`}
+                >
+                  ${ganancia.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+                .
+              </p>
             </CardContent>
           </Card>
         </>
