@@ -41,6 +41,9 @@ export default function ResultadosPage() {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
   const [newRateDate, setNewRateDate] = useState("");
   const [newRateValue, setNewRateValue] = useState("");
+  const [rateSaving, setRateSaving] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [rateSuccess, setRateSuccess] = useState(false);
 
   useEffect(() => {
     fetch("/api/cards")
@@ -143,6 +146,9 @@ export default function ResultadosPage() {
     if (!newRateDate || !newRateValue) return;
     const rate = Number(String(newRateValue).replace(",", "."));
     if (isNaN(rate) || rate <= 0) return;
+    setRateError(null);
+    setRateSuccess(false);
+    setRateSaving(true);
     try {
       const res = await fetch("/api/exchange-rates", {
         method: "POST",
@@ -154,17 +160,22 @@ export default function ResultadosPage() {
         setExchangeRates((prev) => ({ ...prev, [newRateDate]: rate }));
         setNewRateDate("");
         setNewRateValue("");
+        setRateSuccess(true);
+        setTimeout(() => setRateSuccess(false), 3000);
         const refetch = await fetch("/api/exchange-rates");
         const refreshed = await refetch.json();
         if (refreshed && typeof refreshed === "object" && !("error" in refreshed)) {
           setExchangeRates(refreshed);
         }
       } else {
-        alert(data?.error || "Error al guardar. Verifica la conexión a la base de datos.");
+        const errMsg = data?.error || "Error al guardar. Verifica la conexión a la base de datos.";
+        setRateError(errMsg);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      alert(`Error de conexión: ${msg}`);
+      setRateError(`Error de conexión: ${msg}`);
+    } finally {
+      setRateSaving(false);
     }
   };
 
@@ -246,11 +257,20 @@ export default function ResultadosPage() {
                 className="w-[120px]"
               />
             </div>
-            <Button onClick={handleAddRate} disabled={!newRateDate || !newRateValue}>
+            <Button
+              onClick={handleAddRate}
+              disabled={!newRateDate || !newRateValue || rateSaving}
+            >
               <Plus className="h-4 w-4 mr-2" />
-              Guardar
+              {rateSaving ? "Guardando..." : "Guardar"}
             </Button>
           </div>
+          {rateError && (
+            <p className="mt-2 text-sm text-red-600">{rateError}</p>
+          )}
+          {rateSuccess && (
+            <p className="mt-2 text-sm text-green-600">Tasa guardada correctamente.</p>
+          )}
           {fechasParaTasa.length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <p className="text-sm text-muted-foreground mb-2">Fechas con Procesadas/Fees:</p>

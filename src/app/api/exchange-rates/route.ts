@@ -4,6 +4,7 @@ import { exchangeRates } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 /**
  * GET: Lista todos los tipos de cambio de mercado por fecha.
@@ -43,6 +44,12 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    if (!process.env.SUPABASE_DATABASE_URL && !process.env.DATABASE_URL && !process.env.NEON_DATABASE_URL) {
+      return NextResponse.json(
+        { error: "Falta configurar SUPABASE_DATABASE_URL (o DATABASE_URL) en las variables de entorno." },
+        { status: 500 }
+      );
+    }
     await ensureExchangeRatesTable();
     const body = await request.json();
     const { date, rate } = body;

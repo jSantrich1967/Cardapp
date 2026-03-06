@@ -15,10 +15,11 @@ const connectionString =
   process.env.POSTGRES_URL!;
 
 // For query purposes - connect_timeout y ssl para Supabase
+// En Vercel/serverless usar max: 1 para evitar agotar el pool de conexiones
 const client = postgres(connectionString, {
   prepare: false,
   connect_timeout: 30,
-  max: 10,
+  max: process.env.VERCEL ? 1 : 10,
   ssl: "require",
 });
 
