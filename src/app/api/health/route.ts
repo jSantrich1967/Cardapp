@@ -7,10 +7,14 @@ export const dynamic = "force-dynamic";
 /** GET: Prueba la conexión a la base de datos. Útil para diagnosticar "no baja la data". */
 export async function GET() {
   try {
-    await db.select().from(cards).limit(1);
+    const cCount = await db.select().from(cards);
     return NextResponse.json({
       ok: true,
       message: "Conexión a la base de datos OK",
+      data: {
+        cardsCount: cCount.length,
+        db_host: process.env.SUPABASE_DATABASE_URL ? "pooler-config" : "direct-config"
+      }
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -21,9 +25,9 @@ export async function GET() {
         error: msg,
         hint: msg.toLowerCase().includes("password") || msg.toLowerCase().includes("28p01")
           ? "Verifica usuario y contraseña. Si la contraseña tiene *, usa %2A en su lugar."
-          : msg.toLowerCase().includes("connect") || msg.toLowerCase().includes("econnrefused") || msg.toLowerCase().includes("timeout")
-          ? "No se puede conectar. En Supabase Dashboard → Settings → Database, copia la URI de 'Direct connection' (puerto 5432) y úsala como SUPABASE_DATABASE_URL."
-          : "Revisa SUPABASE_DATABASE_URL en .env.local",
+          : msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("abort")
+            ? "Timeout en Vercel. Asegúrate de usar el Pooler (puerto 6543) y tener SUPABASE_DATABASE_URL configurada en el panel de Vercel."
+            : "Revisa las variables de entorno en el panel de Vercel.",
       },
       { status: 500 }
     );
