@@ -15,9 +15,15 @@ export async function fetchWithTimeout(
   try {
     const res = await fetch(url, {
       ...fetchOptions,
-      signal: controller.signal,
+      // Usar la señal solo si se proporciona explícitamente, de lo contrario confiar en el timeout del navegador/Vercel
+      signal: fetchOptions.signal || controller.signal,
     });
     return res;
+  } catch (err: any) {
+    if (err.name === "AbortError" || err.message?.includes("aborted")) {
+      console.warn(`Fetch abortado por timeout (${timeout}ms): ${url}`);
+    }
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
