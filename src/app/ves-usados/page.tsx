@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import * as XLSX from "xlsx";
@@ -39,10 +39,21 @@ interface RecargaRow {
 
 interface TxItem {
   id: string;
-  cardId: string;
+  cardId?: string;
+  card_id?: string;
   date: string;
-  operationType: string;
+  operationType?: string;
+  operation_type?: string;
   amount: string;
+}
+
+function isRecarga(t: TxItem): boolean {
+  const op = (t.operationType ?? t.operation_type ?? "").toUpperCase();
+  return op === "RECARGA" && Math.abs(Number(t.amount)) > 0;
+}
+
+function getCardId(t: TxItem): string {
+  return t.cardId ?? t.card_id ?? "";
 }
 
 export default function VesUsadosPage() {
@@ -52,9 +63,12 @@ export default function VesUsadosPage() {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     const params = new URLSearchParams();
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
@@ -64,18 +78,17 @@ export default function VesUsadosPage() {
     if (cached) {
       setCards(cached.cards ?? []);
       const txList = Array.isArray(cached.transactions) ? cached.transactions : [];
-      const recargas = txList
-        .filter((t) => t.operationType === "RECARGA" && Number(t.amount) > 0)
+      const recargas = txList.filter(isRecarga)
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       let saldoAcum = 0;
       const result: RecargaRow[] = recargas.map((t) => {
-        const usd = Number(t.amount);
+        const usd = Math.abs(Number(t.amount));
         const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
         const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
         saldoAcum += ves + feeMerchant;
         return {
           id: t.id,
-          cardId: t.cardId,
+          cardId: getCardId(t),
           date: t.date,
           usd,
           ves,
@@ -95,37 +108,38 @@ export default function VesUsadosPage() {
         if (data?.error) {
           setCards([]);
           setRows([]);
+          setError(data.error);
           return;
         }
         const cardsData = Array.isArray(data?.cards) ? data.cards : [];
         const txList: TxItem[] = Array.isArray(data?.transactions) ? data.transactions : [];
         setCards(cardsData);
         setCache(cacheKey, { cards: cardsData, transactions: txList });
-        const recargas = txList
-          .filter((t) => t.operationType === "RECARGA" && Number(t.amount) > 0)
+        const recargas = txList.filter(isRecarga)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let saldoAcum = 0;
         const result: RecargaRow[] = recargas.map((t) => {
-          const usd = Number(t.amount);
+          const usd = Math.abs(Number(t.amount));
           const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
           const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
           saldoAcum += ves + feeMerchant;
-          return {
-            id: t.id,
-            cardId: t.cardId,
-            date: t.date,
-            usd,
-            ves,
-            feeMerchant,
-            saldo: saldoAcum,
-          };
-        });
-        setRows(result);
+        return {
+          id: t.id,
+          cardId: getCardId(t),
+          date: t.date,
+          usd,
+          ves,
+          feeMerchant,
+          saldo: saldoAcum,
+        };
+      });
+      setRows(result);
       })
       .catch(() => {
         if (!cancelled) {
           setCards([]);
           setRows([]);
+          setError("No se pudo cargar. Revisa la conexión y reintenta.");
         }
       })
       .finally(() => {
@@ -134,7 +148,7 @@ export default function VesUsadosPage() {
     return () => {
       cancelled = true;
     };
-  }, [filterCardId, filterFrom, filterTo]);
+  }, [filterCardId, filterFrom, filterTo, retryCount]);
 
   const cardMap = new Map(cards.map((c) => [c.id, c]));
   const totalVes = rows.length > 0 ? rows[rows.length - 1]!.saldo : 0;
@@ -259,6 +273,20 @@ export default function VesUsadosPage() {
 
       {loading ? (
         <p className="text-muted-foreground">Cargando...</p>
+      ) : error ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive font-medium">{error}</p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="p-0">
@@ -320,9 +348,9 @@ export default function VesUsadosPage() {
                 </tbody>
               </table>
             </div>
-            {rows.length === 0 && (
+            {rows.length === 0 && !error && (
               <p className="text-center py-12 text-muted-foreground">
-                No hay recargas. Las recargas aparecerán aquí convertidas a VES.
+                No hay recargas. Agrega transacciones de tipo Recarga desde Transacciones o Importar.
               </p>
             )}
           </CardContent>
