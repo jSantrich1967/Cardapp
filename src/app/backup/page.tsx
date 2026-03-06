@@ -79,9 +79,10 @@ export default function BackupPage() {
       // Refresh the page so other components refetch data
       window.location.reload();
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Error al importar respaldo.";
       setMessage({
         type: "error",
-        text: e instanceof Error ? e.message : "Error al importar respaldo.",
+        text: errMsg + " Asegúrate de que el archivo sea un JSON exportado desde esta app.",
       });
     } finally {
       setImporting(false);

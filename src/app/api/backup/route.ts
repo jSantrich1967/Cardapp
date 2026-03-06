@@ -85,20 +85,23 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (!body?.version || !Array.isArray(body.cards) || !Array.isArray(body.transactions)) {
+    if (!body || typeof body !== "object") {
       return NextResponse.json(
-        { error: "Formato de respaldo inválido. Debe incluir version, cards y transactions." },
+        { error: "Formato inválido. El archivo debe ser un JSON con 'cards' y 'transactions'." },
         { status: 400 }
       );
     }
+    const cardsArr = Array.isArray(body.cards) ? body.cards : [];
+    const txArr = Array.isArray(body.transactions) ? body.transactions : [];
 
     await ensureExchangeRatesTable();
-    const rates = body.exchangeRates ?? [];
 
     // Delete in order: transactions first (FK to cards), then cards, then exchange_rates
     await db.delete(transactions);
     await db.delete(cards);
     await db.delete(exchangeRates);
+
+    const rates = Array.isArray(body?.exchangeRates) ? body.exchangeRates : [];
 
     if (rates.length > 0) {
       await db.insert(exchangeRates).values(
@@ -109,9 +112,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (body.cards.length > 0) {
+    if (cardsArr.length > 0) {
       await db.insert(cards).values(
-        body.cards.map((c: { id: string; cardholderName: string; last4: string; status?: string }) => ({
+        cardsArr.map((c: { id: string; cardholderName: string; last4: string; status?: string }) => ({
           id: c.id,
           cardholderName: c.cardholderName,
           last4: c.last4,
@@ -120,9 +123,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (body.transactions.length > 0) {
+    if (txArr.length > 0) {
       await db.insert(transactions).values(
-        body.transactions.map(
+        txArr.map(
           (t: {
             id: string;
             cardId: string;
@@ -148,14 +151,23 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      cardsRestored: body.cards.length,
-      transactionsRestored: body.transactions.length,
+      cardsRestored: cardsArr.length,
+      transactionsRestored: txArr.length,
       exchangeRatesRestored: rates.length,
     });
   } catch (e) {
     console.error(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    const hint =
+      msg.includes("foreign key") || msg.includes("violates foreign key")
+        ? "El archivo puede tener transacciones que referencian tarjetas que no existen. Verifica que cards y transactions estén completos."
+        : msg.includes("invalid input") || msg.includes("syntax")
+          ? "El formato del archivo no es válido. Debe ser un JSON con version, cards y transactions."
+          : msg.includes("connect") || msg.includes("connection")
+            ? "Error de conexión a la base de datos."
+            : msg;
     return NextResponse.json(
-      { error: "Error al importar respaldo. Verifica que el archivo sea válido." },
+      { error: `Error al importar: ${hint}` },
       { status: 500 }
     );
   }
