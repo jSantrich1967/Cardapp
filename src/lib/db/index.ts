@@ -2,8 +2,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-// DATABASE_URL (manual) or POSTGRES_URL (Vercel Marketplace / Neon integration)
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL!;
+// NEON_DATABASE_URL: usa esta variable en Vercel si no puedes editar DATABASE_URL
+// Orden: NEON_DATABASE_URL > DATABASE_URL > POSTGRES_URL
+const connectionString =
+  process.env.NEON_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL!;
 
 // For query purposes
 const client = postgres(connectionString, { prepare: false });
