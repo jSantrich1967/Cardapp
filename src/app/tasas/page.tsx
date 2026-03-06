@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { History, Plus, ArrowLeft } from "lucide-react";
+import { History, Plus, ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { LoadingDots } from "@/components/ui/loading-dots";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -38,7 +38,7 @@ export default function TasasPage() {
   const [rates, setRates] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Fecha por defecto: hoy (evita seleccionar año equivocado, ej. 2025 en vez de 2026)
+  // Fecha por defecto: hoy
   const [newRateDate, setNewRateDate] = useState(() => {
     const d = new Date();
     return d.toISOString().slice(0, 10);
@@ -47,6 +47,7 @@ export default function TasasPage() {
   const [rateSaving, setRateSaving] = useState(false);
   const [rateError, setRateError] = useState<string | null>(null);
   const [rateSuccess, setRateSuccess] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const cacheKey = "tasas_exchange_rates";
@@ -103,8 +104,12 @@ export default function TasasPage() {
       const newRates = normalizeRatesMap({ ...rates, [dateKey]: rate });
       saveRatesToStorage(newRates);
       setRates(newRates);
-      setNewRateDate("");
-      setNewRateValue("");
+
+      if (!isEditing) {
+        setNewRateValue("");
+      }
+      setIsEditing(false);
+
       // Señal para Resultados: refrescar tasas al volver
       try {
         sessionStorage.setItem("cardops_rates_updated", "1");
@@ -122,6 +127,40 @@ export default function TasasPage() {
     } finally {
       setRateSaving(false);
     }
+  };
+
+  const handleDeleteRate = async (date: string) => {
+    if (!confirm(`¿Eliminar la tasa del ${date}?`)) return;
+
+    try {
+      const res = await fetch(`/api/exchange-rates?date=${date}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        const newRates = { ...rates };
+        delete newRates[date];
+        setRates(newRates);
+        saveRatesToStorage(newRates);
+
+        // Señal para Resultados
+        try {
+          sessionStorage.setItem("cardops_rates_updated", "1");
+        } catch { /* ignorar */ }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Error al eliminar");
+      }
+    } catch (err) {
+      alert("Error de conexión al eliminar");
+    }
+  };
+
+  const handleEditClick = (date: string, rate: number) => {
+    setNewRateDate(date);
+    setNewRateValue(String(rate));
+    setIsEditing(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const sortedRates = Object.entries(rates)
@@ -143,39 +182,43 @@ export default function TasasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <History className="h-7 w-7" />
-          Histórico de tasas de cambio
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Todas las tasas de mercado registradas por fecha. Se usa para calcular USD en Resultados.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <History className="h-7 w-7" />
+            Histórico de tasas de cambio
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Todas las tasas de mercado registradas por fecha. Se usa para calcular USD en Resultados.
+          </p>
+        </div>
+        <Button variant="ghost" asChild>
+          <Link href="/resultados" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </Link>
+        </Button>
       </div>
 
-      <Card>
+      <Card className={isEditing ? "border-primary ring-1 ring-primary" : ""}>
         <CardHeader>
-          <CardTitle>Registrar nueva tasa</CardTitle>
+          <CardTitle>{isEditing ? "Editar tasa existente" : "Registrar nueva tasa"}</CardTitle>
           <CardDescription>
             Para Procesadas y Fees: (VES + fee) ÷ tasa del día = USD. Sin tasa guardada se usa 515.
           </CardDescription>
-          <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-wrap gap-4 items-end mt-4">
             <div>
-              <label className="text-sm text-muted-foreground">Fecha (YYYY-MM-DD, igual que en Resultados)</label>
+              <label className="text-sm font-medium mb-1 block">Fecha</label>
               <Input
                 type="date"
                 value={newRateDate}
                 onChange={(e) => setNewRateDate(e.target.value)}
                 className="w-[160px]"
+                disabled={isEditing}
               />
-              {newRateDate && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Se guardará como: {newRateDate}
-                </p>
-              )}
             </div>
             <div>
-              <label className="text-sm text-muted-foreground">Tasa mercado</label>
+              <label className="text-sm font-medium mb-1 block">Tasa mercado (VES/USD)</label>
               <Input
                 type="number"
                 step="0.01"
@@ -183,16 +226,26 @@ export default function TasasPage() {
                 placeholder="ej: 520"
                 value={newRateValue}
                 onChange={(e) => setNewRateValue(e.target.value)}
-                className="w-[120px]"
+                className="w-[150px]"
               />
             </div>
-            <Button
-              onClick={handleAddRate}
-              disabled={!newRateDate || !newRateValue || rateSaving}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              {rateSaving ? "Guardando..." : "Guardar"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleAddRate}
+                disabled={!newRateDate || !newRateValue || rateSaving}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {rateSaving ? "Guardando..." : isEditing ? "Actualizar" : "Guardar"}
+              </Button>
+              {isEditing && (
+                <Button variant="ghost" onClick={() => {
+                  setIsEditing(false);
+                  setNewRateValue("");
+                }}>
+                  Cancelar
+                </Button>
+              )}
+            </div>
           </div>
           {rateError && <p className="mt-2 text-sm text-red-600">{rateError}</p>}
           {rateSuccess && <p className="mt-2 text-sm text-green-600">Tasa guardada correctamente.</p>}
@@ -203,7 +256,7 @@ export default function TasasPage() {
         <CardHeader>
           <CardTitle>Tasas por fecha</CardTitle>
           <CardDescription>
-            Ordenadas de la más reciente a la más antigua. Sin tasa guardada se usa 515 por defecto.
+            Ordenadas de la más reciente a la más antigua.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -224,17 +277,40 @@ export default function TasasPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium">Fecha</th>
                     <th className="text-right py-3 px-4 font-medium">Tasa (VES/USD)</th>
+                    <th className="text-right py-3 px-4 font-medium">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedRates.map(({ date, rate }) => (
-                    <tr key={date} className="border-b last:border-0 hover:bg-muted/50">
+                    <tr key={date} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-4">
-                        {formatDate(date)}
+                        <span className="font-medium">{formatDate(date)}</span>
                         <span className="text-muted-foreground text-xs ml-2">({date})</span>
                       </td>
-                      <td className="text-right py-3 px-4 font-mono font-medium">
+                      <td className="text-right py-3 px-4 font-mono font-bold text-base">
                         {Number(rate).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right py-3 px-4">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => handleEditClick(date, rate)}
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteRate(date)}
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -244,13 +320,6 @@ export default function TasasPage() {
           )}
         </CardContent>
       </Card>
-
-      <Button variant="ghost" asChild>
-        <Link href="/resultados" className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Volver a Resultados
-        </Link>
-      </Button>
     </div>
   );
 }

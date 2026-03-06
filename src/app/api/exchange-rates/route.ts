@@ -96,3 +96,28 @@ export async function POST(request: Request) {
     );
   }
 }
+
+/**
+ * DELETE: Eliminar tipo de cambio para una fecha.
+ * URL: /api/exchange-rates?date=YYYY-MM-DD
+ */
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
+
+    if (!date) {
+      return NextResponse.json({ error: "Falta el parámetro date" }, { status: 400 });
+    }
+
+    await db.delete(exchangeRates).where(eq(exchangeRates.date, date));
+
+    return NextResponse.json({ success: true, date });
+  } catch (e) {
+    console.error("[exchange-rates DELETE]", e);
+    return NextResponse.json(
+      { error: "Error al eliminar tipo de cambio" },
+      { status: 500 }
+    );
+  }
+}
