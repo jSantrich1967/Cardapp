@@ -28,7 +28,11 @@ export function DashboardSummary() {
         <CardContent className="pt-6">
           <p className="text-sm text-destructive">{data.error}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Verifica la conexión a la base de datos en .env.local (SUPABASE_DATABASE_URL). Si la contraseña tiene *, reemplázala por %2A.
+            Verifica SUPABASE_DATABASE_URL en .env.local. Si la contraseña tiene *, usa %2A. Prueba{" "}
+            <a href="/api/health" target="_blank" rel="noopener noreferrer" className="underline">
+              /api/health
+            </a>{" "}
+            para ver el error exacto.
           </p>
         </CardContent>
       </Card>
