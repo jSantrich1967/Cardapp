@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -44,6 +44,14 @@ export default function ResultadosPage() {
   const [rateSaving, setRateSaving] = useState(false);
   const [rateError, setRateError] = useState<string | null>(null);
   const [rateSuccess, setRateSuccess] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetch("/api/cards")
@@ -52,7 +60,7 @@ export default function ResultadosPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/exchange-rates")
+    fetch("/api/exchange-rates", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (data && typeof data === "object" && !("error" in data)) {
@@ -157,16 +165,30 @@ export default function ResultadosPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setExchangeRates((prev) => ({ ...prev, [newRateDate]: rate }));
+        const savedDate = newRateDate;
+        setExchangeRates((prev) => ({ ...prev, [savedDate]: rate }));
         setNewRateDate("");
         setNewRateValue("");
         setRateSuccess(true);
-        setTimeout(() => setRateSuccess(false), 3000);
-        const refetch = await fetch("/api/exchange-rates");
-        const refreshed = await refetch.json();
-        if (refreshed && typeof refreshed === "object" && !("error" in refreshed)) {
-          setExchangeRates(refreshed);
-        }
+        setTimeout(() => {
+          if (mountedRef.current) setRateSuccess(false);
+        }, 3000);
+        // Refetch en segundo plano; fusionar con estado actual para no perder la tasa recién guardada
+        fetch("/api/exchange-rates", { cache: "no-store" })
+          .then((r) => r.json())
+          .then((refreshed) => {
+            if (!mountedRef.current) return;
+            if (refreshed && typeof refreshed === "object" && !("error" in refreshed) && !Array.isArray(refreshed)) {
+              const normalized: Record<string, number> = {};
+              for (const [k, v] of Object.entries(refreshed)) {
+                const key = String(k).slice(0, 10);
+                const num = Number(v);
+                if (!isNaN(num) && num > 0) normalized[key] = num;
+              }
+              setExchangeRates((prev) => ({ ...prev, ...normalized }));
+            }
+          })
+          .catch(() => { /* ignorar errores del refetch */ });
       } else {
         const errMsg = data?.error || "Error al guardar. Verifica la conexión a la base de datos.";
         setRateError(errMsg);

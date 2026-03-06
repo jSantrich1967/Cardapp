@@ -26,7 +26,8 @@ export async function GET() {
     }
     const map: Record<string, number> = {};
     result.forEach((r) => {
-      map[r.date] = Number(r.rate);
+      const dateKey = String(r.date).slice(0, 10);
+      map[dateKey] = Number(r.rate);
     });
     return NextResponse.json(map);
   } catch (e) {
