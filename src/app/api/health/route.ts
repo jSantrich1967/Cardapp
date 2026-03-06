@@ -7,13 +7,17 @@ export const dynamic = "force-dynamic";
 /** GET: Prueba la conexión a la base de datos. Útil para diagnosticar "no baja la data". */
 export async function GET() {
   try {
+    const start = Date.now();
     const cCount = await db.select().from(cards);
+    const duration = Date.now() - start;
     return NextResponse.json({
       ok: true,
       message: "Conexión a la base de datos OK",
       data: {
         cardsCount: cCount.length,
-        db_host: process.env.SUPABASE_DATABASE_URL ? "pooler-config" : "direct-config"
+        db_duration_ms: duration,
+        db_host: process.env.SUPABASE_DATABASE_URL ? "pooler-config" : "direct-config",
+        region: process.env.VERCEL_REGION || "local"
       }
     });
   } catch (e) {
