@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { cards, transactions } from "@/lib/db/schema";
+import { db, ensureExchangeRatesTable } from "@/lib/db";
+import { cards, transactions, exchangeRates } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export interface BackupData {
   version: 1;
   exportedAt: string;
+  exchangeRates?: Array<{ date: string; rate: number }>;
   cards: Array<{
     id: string;
     cardholderName: string;
@@ -31,6 +32,12 @@ export interface BackupData {
  */
 export async function GET() {
   try {
+    let ratesList: Array<{ date: string; rate: string }> = [];
+    try {
+      ratesList = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+    } catch {
+      // Tabla puede no existir aún
+    }
     const [cardsList, txList] = await Promise.all([
       db.select().from(cards).orderBy(asc(cards.createdAt)),
       db.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt)),
@@ -39,6 +46,9 @@ export async function GET() {
     const backup: BackupData = {
       version: 1,
       exportedAt: new Date().toISOString(),
+      exchangeRates: Array.isArray(ratesList)
+        ? ratesList.map((r) => ({ date: r.date, rate: Number(r.rate) }))
+        : undefined,
       cards: cardsList.map((c) => ({
         id: c.id,
         cardholderName: c.cardholderName,
@@ -82,9 +92,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Delete in order: transactions first (FK to cards), then cards
+    await ensureExchangeRatesTable();
+    const rates = body.exchangeRates ?? [];
+
+    // Delete in order: transactions first (FK to cards), then cards, then exchange_rates
     await db.delete(transactions);
     await db.delete(cards);
+    await db.delete(exchangeRates);
+
+    if (rates.length > 0) {
+      await db.insert(exchangeRates).values(
+        rates.map((r: { date: string; rate: number }) => ({
+          date: String(r.date).slice(0, 10),
+          rate: String(r.rate),
+        }))
+      );
+    }
 
     if (body.cards.length > 0) {
       await db.insert(cards).values(
@@ -127,6 +150,7 @@ export async function POST(request: Request) {
       success: true,
       cardsRestored: body.cards.length,
       transactionsRestored: body.transactions.length,
+      exchangeRatesRestored: rates.length,
     });
   } catch (e) {
     console.error(e);

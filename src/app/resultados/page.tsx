@@ -143,15 +143,28 @@ export default function ResultadosPage() {
     if (!newRateDate || !newRateValue) return;
     const rate = Number(newRateValue);
     if (isNaN(rate) || rate <= 0) return;
-    const res = await fetch("/api/exchange-rates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: newRateDate, rate }),
-    });
-    if (res.ok) {
-      setExchangeRates((prev) => ({ ...prev, [newRateDate]: rate }));
-      setNewRateDate("");
-      setNewRateValue("");
+    try {
+      const res = await fetch("/api/exchange-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: newRateDate, rate }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setExchangeRates((prev) => ({ ...prev, [newRateDate]: rate }));
+        setNewRateDate("");
+        setNewRateValue("");
+        // Refetch para confirmar que se guardó en la base de datos
+        const refetch = await fetch("/api/exchange-rates");
+        const refreshed = await refetch.json();
+        if (refreshed && typeof refreshed === "object" && !("error" in refreshed)) {
+          setExchangeRates(refreshed);
+        }
+      } else {
+        alert(data?.error || "Error al guardar. Verifica la conexión a la base de datos.");
+      }
+    } catch {
+      alert("Error de conexión. Verifica que DATABASE_URL esté configurado.");
     }
   };
 
