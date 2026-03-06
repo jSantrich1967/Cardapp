@@ -1,7 +1,5 @@
-import { config } from "dotenv";
-import { join } from "path";
-config(); // .env
-config({ path: join(process.cwd(), ".env.local"), override: true }); // .env.local tiene prioridad
+// Next.js maneja las variables de entorno de .env y .env.local automáticamente.
+// Solo es necesario config() si se ejecutan scripts fuera de Next.js.
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

@@ -5,6 +5,7 @@ import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 import { getCurrentBalance } from "@/lib/utils/balance";
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = ["iad1"];
 
 /**
  * API used by DashboardSummary for global summary and per-card balances.
@@ -25,10 +26,10 @@ export async function GET(request: Request) {
     const txList =
       conditions.length > 0
         ? await db
-            .select()
-            .from(transactions)
-            .where(and(...conditions))
-            .orderBy(asc(transactions.date), asc(transactions.createdAt))
+          .select()
+          .from(transactions)
+          .where(and(...conditions))
+          .orderBy(asc(transactions.date), asc(transactions.createdAt))
         : await db.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt));
 
     const recarga = txList

@@ -3,6 +3,9 @@ import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cards } from "@/lib/db/schema";
 
+export const dynamic = "force-dynamic";
+export const preferredRegion = ["iad1"];
+
 export async function GET() {
   try {
     const result = await db.select().from(cards).orderBy(desc(cards.createdAt));

@@ -5,6 +5,7 @@ import { asc, and, eq, gte, lte } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+export const preferredRegion = ["iad1"];
 
 /**
  * GET: Datos combinados para la página Resultados (cards + transactions + exchangeRates)

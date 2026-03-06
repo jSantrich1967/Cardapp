@@ -4,6 +4,7 @@ import { cards, transactions } from "@/lib/db/schema";
 import { asc, and, eq, gte, lte, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = ["iad1"];
 
 /** GET: cards + transactions en una sola petición */
 export async function GET(request: Request) {
@@ -29,10 +30,10 @@ export async function GET(request: Request) {
     const txQuery =
       conditions.length > 0
         ? db
-            .select()
-            .from(transactions)
-            .where(and(...conditions))
-            .orderBy(asc(transactions.date), asc(transactions.createdAt))
+          .select()
+          .from(transactions)
+          .where(and(...conditions))
+          .orderBy(asc(transactions.date), asc(transactions.createdAt))
         : db.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt));
 
     const [cardsList, txList] = await Promise.all([
