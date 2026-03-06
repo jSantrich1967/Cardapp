@@ -36,9 +36,9 @@ if (!connectionString) {
 // En Vercel: pooler con workaround; max: 1 para serverless
 const client = postgres(connectionString, {
   prepare: false,
-  connect_timeout: process.env.VERCEL ? 15 : 60,
+  connect_timeout: process.env.VERCEL ? 30 : 60,
   idle_timeout: 20,
-  max: process.env.VERCEL ? 1 : 10,
+  max: process.env.VERCEL ? 3 : 10,
   ssl: "require",
 });
 
