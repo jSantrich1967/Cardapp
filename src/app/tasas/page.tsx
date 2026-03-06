@@ -104,6 +104,12 @@ export default function TasasPage() {
       setRates(newRates);
       setNewRateDate("");
       setNewRateValue("");
+      // Señal para Resultados: refrescar tasas al volver
+      try {
+        sessionStorage.setItem("cardops_rates_updated", "1");
+      } catch {
+        /* ignorar */
+      }
       if (res.ok) {
         setRateSuccess(true);
         setTimeout(() => setRateSuccess(false), 3000);
@@ -154,13 +160,18 @@ export default function TasasPage() {
           </CardDescription>
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="text-sm text-muted-foreground">Fecha</label>
+              <label className="text-sm text-muted-foreground">Fecha (YYYY-MM-DD, igual que en Resultados)</label>
               <Input
                 type="date"
                 value={newRateDate}
                 onChange={(e) => setNewRateDate(e.target.value)}
                 className="w-[160px]"
               />
+              {newRateDate && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se guardará como: {newRateDate}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Tasa mercado</label>

@@ -152,6 +152,15 @@ export default function ResultadosPage() {
 
   useEffect(() => {
     refreshRates();
+    // Si venimos de Histórico Tasas (acabamos de agregar/editar), forzar refresh
+    try {
+      if (sessionStorage.getItem("cardops_rates_updated") === "1") {
+        sessionStorage.removeItem("cardops_rates_updated");
+        refreshRates();
+      }
+    } catch {
+      /* ignorar */
+    }
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshRates();
     };
@@ -283,8 +292,14 @@ export default function ResultadosPage() {
             <Link href="/tasas" className="text-primary hover:underline font-medium">
               Histórico de tasas
             </Link>
-            .
+            . Las tasas se sincronizan automáticamente.
           </CardDescription>
+          <div className="mt-2 flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refreshRates()}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refrescar tasas
+            </Button>
+          </div>
           {fechasParaTasa.length > 0 && (
             <div className="mt-2">
               <p className="text-sm text-muted-foreground mb-2">Fechas con Procesadas/Fees:</p>
@@ -297,6 +312,7 @@ export default function ResultadosPage() {
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800"
                     }`}
+                    title="Formato YYYY-MM-DD (igual que en Histórico de tasas)"
                   >
                     {f}: {exchangeRates[f] ?? "sin tasa (usa 515)"}
                   </span>
