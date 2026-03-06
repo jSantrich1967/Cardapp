@@ -7,12 +7,22 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-// Prioridad: SUPABASE_DATABASE_URL (evita conflicto con DATABASE_URL del sistema) > NEON > DATABASE_URL > POSTGRES_URL
-const connectionString =
+// Prioridad: SUPABASE_DATABASE_URL > NEON > DATABASE_URL > POSTGRES_URL
+let connectionString =
   process.env.SUPABASE_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
   process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL!;
+  process.env.POSTGRES_URL ||
+  "";
+
+// El * en contraseñas rompe el parseo de la URL; codificar como %2A
+if (connectionString && connectionString.includes("*") && !connectionString.includes("%2A")) {
+  connectionString = connectionString.replace(/\*/g, "%2A");
+}
+
+if (!connectionString) {
+  throw new Error("No hay URL de base de datos. Configura SUPABASE_DATABASE_URL en .env.local");
+}
 
 // For query purposes - connect_timeout y ssl para Supabase
 // En Vercel/serverless usar max: 1 para evitar agotar el pool de conexiones

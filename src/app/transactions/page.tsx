@@ -25,6 +25,7 @@ import {
 import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard } from "@/lib/utils/balance";
 import { parseAmount } from "@/lib/utils/parse";
 import { Plus, Trash2, FileSpreadsheet, FileText } from "lucide-react";
+import { getCached, setCache } from "@/lib/cache";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -79,35 +80,29 @@ function TransactionsContent() {
     notes: "",
   });
 
-  const fetchCards = () => {
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => setCards(Array.isArray(data) ? data : []));
-  };
-
-  useEffect(() => {
-    fetchCards();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const fetchData = () => {
     const params = new URLSearchParams();
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
     if (filterType && filterType !== "all") params.set("type", filterType);
-    fetch(`/api/transactions?${params}`, { cache: "no-store" })
+    setLoading(true);
+    fetch(`/api/transactions-data?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled) setTransactions(Array.isArray(data) ? data : []);
+        if (data?.error) {
+          setCards([]);
+          setTransactions([]);
+          return;
+        }
+        setCards(Array.isArray(data?.cards) ? data.cards : []);
+        setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData();
   }, [filterCardId, filterFrom, filterTo, filterType]);
 
   const filteredByCard =
@@ -177,16 +172,7 @@ function TransactionsContent() {
       : computeRunningBalancePerCard(displayRows);
   const balance = getCurrentBalance(filteredByCard);
 
-  const refetchTransactions = () => {
-    const params = new URLSearchParams();
-    if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
-    if (filterFrom) params.set("from", filterFrom);
-    if (filterTo) params.set("to", filterTo);
-    if (filterType && filterType !== "all") params.set("type", filterType);
-    fetch(`/api/transactions?${params}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => setTransactions(Array.isArray(data) ? data : []));
-  };
+  const refetchTransactions = () => fetchData(true);
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta transacción?")) return;

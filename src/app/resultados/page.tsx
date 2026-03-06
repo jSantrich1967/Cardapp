@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -10,11 +10,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, Plus } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp } from "lucide-react";
+import { getCached, setCache } from "@/lib/cache";
+import { normalizeDateKey, normalizeRatesMap } from "@/lib/utils/date-keys";
 
 const TIPO_CAMBIO_RECARGA = 515; // Para calcular VES: USD × 515
 const FEE_MERCHANT_PCT = 0.04; // 4% por recarga en bolívares
+const STORAGE_KEY = "cardops_exchange_rates";
+
+function loadRatesFromStorage(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 interface CardItem {
   id: string;
@@ -39,50 +54,43 @@ export default function ResultadosPage() {
   const [filterTo, setFilterTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
-  const [newRateDate, setNewRateDate] = useState("");
-  const [newRateValue, setNewRateValue] = useState("");
-  const [rateSaving, setRateSaving] = useState(false);
-  const [rateError, setRateError] = useState<string | null>(null);
-  const [rateSuccess, setRateSuccess] = useState(false);
-  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => setCards(Array.isArray(data) ? data : []));
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/exchange-rates", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && typeof data === "object" && !("error" in data)) {
-          setExchangeRates(data);
-        } else {
-          setExchangeRates({});
-        }
-      })
-      .catch(() => setExchangeRates({}));
-  }, []);
-
+  // Datos de Resultados: cards + transactions
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     const params = new URLSearchParams();
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
-    fetch(`/api/transactions?${params}`, { cache: "no-store" })
+    const cacheKey = `resultados_${params.toString()}`;
+    const cached = getCached<{ cards: CardItem[]; transactions: Transaction[] }>(cacheKey);
+    if (cached) {
+      setCards(cached.cards ?? []);
+      setTransactions(cached.transactions ?? []);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    fetch(`/api/resultados?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled) setTransactions(Array.isArray(data) ? data : []);
+        if (cancelled) return;
+        if (data?.error) {
+          setCards([]);
+          setTransactions([]);
+          return;
+        }
+        const cardsData = Array.isArray(data?.cards) ? data.cards : [];
+        const txData = Array.isArray(data?.transactions) ? data.transactions : [];
+        setCards(cardsData);
+        setTransactions(txData);
+        setCache(cacheKey, { cards: cardsData, transactions: txData });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCards([]);
+          setTransactions([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -91,6 +99,40 @@ export default function ResultadosPage() {
       cancelled = true;
     };
   }, [filterCardId, filterFrom, filterTo]);
+
+  // Tasas: desde Histórico de tasas (mismo endpoint + localStorage)
+  const refreshRates = () => {
+    const storedRates = normalizeRatesMap(loadRatesFromStorage());
+    setExchangeRates(storedRates);
+    fetch("/api/exchange-rates", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        const apiRates =
+          data && typeof data === "object" && !("error" in data) ? data : {};
+        const merged = normalizeRatesMap({
+          ...apiRates,
+          ...loadRatesFromStorage(),
+        });
+        setExchangeRates(merged);
+      })
+      .catch(() => setExchangeRates(normalizeRatesMap(loadRatesFromStorage())));
+  };
+
+  useEffect(() => {
+    refreshRates();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshRates();
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) refreshRates();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   // USD recibidos = Procesada - fees (Fee Vzla + Fee Merchant)
   const procesadas = transactions.filter((t) => t.operationType === "PROCESADA");
@@ -125,7 +167,7 @@ export default function ResultadosPage() {
 
   let usdGastadoVes = 0;
   procesadas.forEach((p) => {
-    const dateStr = p.date.split("T")[0] ?? p.date;
+    const dateStr = normalizeDateKey(p.date);
     const usd = Math.abs(Number(p.amount));
     const ves = Math.round(usd * TIPO_CAMBIO_RECARGA * 100) / 100;
     const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
@@ -134,7 +176,7 @@ export default function ResultadosPage() {
     usdGastadoVes += totalVes / (tasaMercado && tasaMercado > 0 ? tasaMercado : TIPO_CAMBIO_RECARGA);
   });
   fees.forEach((f) => {
-    const dateStr = f.date.split("T")[0] ?? f.date;
+    const dateStr = normalizeDateKey(f.date);
     const feeUsd = Math.abs(Number(f.amount));
     const vesEquiv = Math.round(feeUsd * TIPO_CAMBIO_RECARGA * 100) / 100;
     const tasaMercado = exchangeRates[dateStr];
@@ -145,61 +187,10 @@ export default function ResultadosPage() {
 
   const fechasParaTasa = [
     ...new Set([
-      ...procesadas.map((p) => p.date.split("T")[0] ?? p.date),
-      ...fees.map((f) => f.date.split("T")[0] ?? f.date),
+      ...procesadas.map((p) => normalizeDateKey(p.date)),
+      ...fees.map((f) => normalizeDateKey(f.date)),
     ]),
-  ].sort();
-
-  const handleAddRate = async () => {
-    if (!newRateDate || !newRateValue) return;
-    const rate = Number(String(newRateValue).replace(",", "."));
-    if (isNaN(rate) || rate <= 0) return;
-    setRateError(null);
-    setRateSuccess(false);
-    setRateSaving(true);
-    try {
-      const res = await fetch("/api/exchange-rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: newRateDate, rate }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        const savedDate = newRateDate;
-        setExchangeRates((prev) => ({ ...prev, [savedDate]: rate }));
-        setNewRateDate("");
-        setNewRateValue("");
-        setRateSuccess(true);
-        setTimeout(() => {
-          if (mountedRef.current) setRateSuccess(false);
-        }, 3000);
-        // Refetch en segundo plano; fusionar con estado actual para no perder la tasa recién guardada
-        fetch("/api/exchange-rates", { cache: "no-store" })
-          .then((r) => r.json())
-          .then((refreshed) => {
-            if (!mountedRef.current) return;
-            if (refreshed && typeof refreshed === "object" && !("error" in refreshed) && !Array.isArray(refreshed)) {
-              const normalized: Record<string, number> = {};
-              for (const [k, v] of Object.entries(refreshed)) {
-                const key = String(k).slice(0, 10);
-                const num = Number(v);
-                if (!isNaN(num) && num > 0) normalized[key] = num;
-              }
-              setExchangeRates((prev) => ({ ...prev, ...normalized }));
-            }
-          })
-          .catch(() => { /* ignorar errores del refetch */ });
-      } else {
-        const errMsg = data?.error || "Error al guardar. Verifica la conexión a la base de datos.";
-        setRateError(errMsg);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setRateError(`Error de conexión: ${msg}`);
-    } finally {
-      setRateSaving(false);
-    }
-  };
+  ].filter(Boolean).sort();
 
   return (
     <div className="space-y-6">
@@ -256,45 +247,14 @@ export default function ResultadosPage() {
           <CardTitle>Tipo de cambio de mercado por fecha</CardTitle>
           <CardDescription>
             Para Procesadas y Fees: (VES + fee) ÷ tasa del día = USD. Sin tasa guardada se usa 515.
+            Para agregar o editar tasas, ve a{" "}
+            <Link href="/tasas" className="text-primary hover:underline font-medium">
+              Histórico de tasas
+            </Link>
+            .
           </CardDescription>
-          <div className="flex flex-wrap gap-4 items-end">
-            <div>
-              <label className="text-sm text-muted-foreground">Fecha</label>
-              <Input
-                type="date"
-                value={newRateDate}
-                onChange={(e) => setNewRateDate(e.target.value)}
-                className="w-[160px]"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground">Tasa mercado</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="1"
-                placeholder="ej: 520"
-                value={newRateValue}
-                onChange={(e) => setNewRateValue(e.target.value)}
-                className="w-[120px]"
-              />
-            </div>
-            <Button
-              onClick={handleAddRate}
-              disabled={!newRateDate || !newRateValue || rateSaving}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              {rateSaving ? "Guardando..." : "Guardar"}
-            </Button>
-          </div>
-          {rateError && (
-            <p className="mt-2 text-sm text-red-600">{rateError}</p>
-          )}
-          {rateSuccess && (
-            <p className="mt-2 text-sm text-green-600">Tasa guardada correctamente.</p>
-          )}
           {fechasParaTasa.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-2">
               <p className="text-sm text-muted-foreground mb-2">Fechas con Procesadas/Fees:</p>
               <div className="flex flex-wrap gap-2">
                 {fechasParaTasa.map((f) => (

@@ -9,15 +9,31 @@ export function DashboardSummary() {
   const [data, setData] = useState<{
     summary?: { balance: number; recarga: number; procesada: number; feeVzla: number; feeMerchant: number };
     byCard?: Array<{ cardholderName: string; last4: string; balance: number }>;
+    error?: string;
   } | null>(null);
 
   useEffect(() => {
     fetch("/api/reports")
       .then((r) => r.json())
-      .then(setData)
-      .catch(() => setData(null));
+      .then((d) => {
+        if (d?.error) setData({ error: d.error });
+        else setData(d);
+      })
+      .catch(() => setData({ error: "Error de conexión" }));
   }, []);
 
+  if (data?.error) {
+    return (
+      <Card className="border-destructive/50 bg-destructive/5">
+        <CardContent className="pt-6">
+          <p className="text-sm text-destructive">{data.error}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Verifica la conexión a la base de datos en .env.local (SUPABASE_DATABASE_URL). Si la contraseña tiene *, reemplázala por %2A.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
   if (!data?.summary) return null;
 
   return (

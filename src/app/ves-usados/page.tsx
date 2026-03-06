@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { FileSpreadsheet, FileText } from "lucide-react";
+import { getCached, setCache } from "@/lib/cache";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -44,24 +45,60 @@ export default function VesUsadosPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/cards")
-      .then((r) => r.json())
-      .then((data) => setCards(Array.isArray(data) ? data : []));
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     const params = new URLSearchParams();
-    params.set("type", "RECARGA");
     if (filterCardId && filterCardId !== "all") params.set("cardId", filterCardId);
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
-    fetch(`/api/transactions?${params}`, { cache: "no-store" })
+    const cacheKey = `ves-usados_${params.toString()}`;
+    const cached = getCached<{ cards: CardItem[]; transactions: unknown[] }>(cacheKey);
+    if (cached) {
+      setCards(cached.cards ?? []);
+      const txList = Array.isArray(cached.transactions) ? cached.transactions : [];
+      const recargas = txList
+        .filter((t: { operationType: string; amount: string }) => {
+          if (t.operationType !== "RECARGA") return false;
+          const amt = Number(t.amount);
+          return amt > 0;
+        })
+        .sort(
+          (a: { date: string }, b: { date: string }) =>
+            new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+      let saldoAcum = 0;
+      const result: RecargaRow[] = recargas.map((t: { id: string; cardId: string; date: string; amount: string }) => {
+        const usd = Number(t.amount);
+        const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
+        const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
+        saldoAcum += ves + feeMerchant;
+        return {
+          id: t.id,
+          cardId: t.cardId,
+          date: t.date,
+          usd,
+          ves,
+          feeMerchant,
+          saldo: saldoAcum,
+        };
+      });
+      setRows(result);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    fetch(`/api/ves-usados-data?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const txList = Array.isArray(data) ? data : [];
+        if (data?.error) {
+          setCards([]);
+          setRows([]);
+          return;
+        }
+        const cardsData = Array.isArray(data?.cards) ? data.cards : [];
+        const txList = Array.isArray(data?.transactions) ? data.transactions : [];
+        setCards(cardsData);
+        setCache(cacheKey, { cards: cardsData, transactions: txList });
         const recargas = txList
           .filter((t: { operationType: string; amount: string }) => {
             if (t.operationType !== "RECARGA") return false;
@@ -72,13 +109,11 @@ export default function VesUsadosPage() {
             (a: { date: string }, b: { date: string }) =>
               new Date(a.date).getTime() - new Date(b.date).getTime()
           );
-
         let saldoAcum = 0;
         const result: RecargaRow[] = recargas.map((t: { id: string; cardId: string; date: string; amount: string }) => {
           const usd = Number(t.amount);
           const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
           const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
-          // Ambas son negativas (salidas): -VES + (-Fee) = -(VES + Fee), se suman
           saldoAcum += ves + feeMerchant;
           return {
             id: t.id,

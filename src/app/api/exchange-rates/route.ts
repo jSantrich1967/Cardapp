@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, ensureExchangeRatesTable } from "@/lib/db";
 import { exchangeRates } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -26,7 +26,7 @@ export async function GET() {
     }
     const map: Record<string, number> = {};
     result.forEach((r) => {
-      const dateKey = String(r.date).slice(0, 10);
+      const dateKey = String(r.date).replace(/T.*/, "").slice(0, 10);
       map[dateKey] = Number(r.rate);
     });
     return NextResponse.json(map);
@@ -71,13 +71,12 @@ export async function POST(request: Request) {
       );
     }
 
-    await db
-      .insert(exchangeRates)
-      .values({ date: dateStr, rate: String(rateNum) })
-      .onConflictDoUpdate({
-        target: exchangeRates.date,
-        set: { rate: String(rateNum) },
-      });
+    // Mismo patrón que backup (delete + insert) para compatibilidad con pooler
+    await db.delete(exchangeRates).where(eq(exchangeRates.date, dateStr));
+    await db.insert(exchangeRates).values({
+      date: dateStr,
+      rate: String(rateNum),
+    });
 
     return NextResponse.json({ date: dateStr, rate: rateNum });
   } catch (e) {
