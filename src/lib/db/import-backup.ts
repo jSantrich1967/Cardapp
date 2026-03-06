@@ -56,41 +56,39 @@ async function importBackup() {
   }
 
   if (cardsArr.length > 0) {
-    await db.insert(cards).values(
-      cardsArr.map((c: { id: string; cardholderName: string; last4: string; status?: string }) => ({
-        id: c.id,
-        cardholderName: c.cardholderName,
-        last4: c.last4,
-        status: c.status === "inactive" ? "inactive" : "active",
-      }))
-    );
+    type CardRow = { id: string; cardholderName: string; last4: string; status?: string };
+    const rows = (cardsArr as CardRow[]).map((c) => ({
+      id: c.id,
+      cardholderName: c.cardholderName,
+      last4: c.last4,
+      status: (c.status === "inactive" ? "inactive" : "active") as "active" | "inactive",
+    }));
+    await db.insert(cards).values(rows);
     console.log("Tarjetas importadas:", cardsArr.length);
   }
 
   if (txArr.length > 0) {
-    await db.insert(transactions).values(
-      txArr.map(
-        (t: {
-          id: string;
-          cardId: string;
-          date: string;
-          operationType: string;
-          amount: string;
-          notes?: string | null;
-          source?: string;
-          parentTransactionId?: string | null;
-        }) => ({
-          id: t.id,
-          cardId: t.cardId,
-          date: t.date,
-          operationType: t.operationType,
-          amount: t.amount,
-          notes: t.notes ?? null,
-          source: t.source ?? "manual",
-          parentTransactionId: t.parentTransactionId ?? null,
-        })
-      )
-    );
+    type TxRow = {
+      id: string;
+      cardId: string;
+      date: string;
+      operationType: string;
+      amount: string;
+      notes?: string | null;
+      source?: string;
+      parentTransactionId?: string | null;
+    };
+    const txRows = (txArr as TxRow[]).map((t) => ({
+      id: t.id,
+      cardId: t.cardId,
+      date: t.date,
+      operationType: t.operationType as "RECARGA" | "PROCESADA" | "FEE_VZLA" | "FEE_MERCHANT",
+      amount: t.amount,
+      notes: t.notes ?? null,
+      source: (t.source === "import" ? "import" : "manual") as "manual" | "import",
+      parentTransactionId: t.parentTransactionId ?? null,
+    }));
+    await db.insert(transactions).values(txRows);
     console.log("Transacciones importadas:", txArr.length);
   }
 

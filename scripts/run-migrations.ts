@@ -21,7 +21,7 @@ if (!url) {
 }
 
 async function main() {
-  const sql = postgres(url, { prepare: false });
+  const sql = postgres(url as string, { prepare: false });
 
   const files = [
     join(process.cwd(), "drizzle", "0000_init.sql"),
