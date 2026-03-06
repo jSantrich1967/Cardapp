@@ -172,7 +172,7 @@ function TransactionsContent() {
       : computeRunningBalancePerCard(displayRows);
   const balance = getCurrentBalance(filteredByCard);
 
-  const refetchTransactions = () => fetchData(true);
+  const refetchTransactions = () => fetchData();
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar esta transacción?")) return;

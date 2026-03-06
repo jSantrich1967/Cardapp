@@ -36,6 +36,14 @@ interface RecargaRow {
   saldo: number;
 }
 
+interface TxItem {
+  id: string;
+  cardId: string;
+  date: string;
+  operationType: string;
+  amount: string;
+}
+
 export default function VesUsadosPage() {
   const [cards, setCards] = useState<CardItem[]>([]);
   const [rows, setRows] = useState<RecargaRow[]>([]);
@@ -51,22 +59,15 @@ export default function VesUsadosPage() {
     if (filterFrom) params.set("from", filterFrom);
     if (filterTo) params.set("to", filterTo);
     const cacheKey = `ves-usados_${params.toString()}`;
-    const cached = getCached<{ cards: CardItem[]; transactions: unknown[] }>(cacheKey);
+    const cached = getCached<{ cards: CardItem[]; transactions: TxItem[] }>(cacheKey);
     if (cached) {
       setCards(cached.cards ?? []);
       const txList = Array.isArray(cached.transactions) ? cached.transactions : [];
       const recargas = txList
-        .filter((t: { operationType: string; amount: string }) => {
-          if (t.operationType !== "RECARGA") return false;
-          const amt = Number(t.amount);
-          return amt > 0;
-        })
-        .sort(
-          (a: { date: string }, b: { date: string }) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+        .filter((t) => t.operationType === "RECARGA" && Number(t.amount) > 0)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       let saldoAcum = 0;
-      const result: RecargaRow[] = recargas.map((t: { id: string; cardId: string; date: string; amount: string }) => {
+      const result: RecargaRow[] = recargas.map((t) => {
         const usd = Number(t.amount);
         const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
         const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
@@ -96,21 +97,14 @@ export default function VesUsadosPage() {
           return;
         }
         const cardsData = Array.isArray(data?.cards) ? data.cards : [];
-        const txList = Array.isArray(data?.transactions) ? data.transactions : [];
+        const txList: TxItem[] = Array.isArray(data?.transactions) ? data.transactions : [];
         setCards(cardsData);
         setCache(cacheKey, { cards: cardsData, transactions: txList });
         const recargas = txList
-          .filter((t: { operationType: string; amount: string }) => {
-            if (t.operationType !== "RECARGA") return false;
-            const amt = Number(t.amount);
-            return amt > 0;
-          })
-          .sort(
-            (a: { date: string }, b: { date: string }) =>
-              new Date(a.date).getTime() - new Date(b.date).getTime()
-          );
+          .filter((t) => t.operationType === "RECARGA" && Number(t.amount) > 0)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let saldoAcum = 0;
-        const result: RecargaRow[] = recargas.map((t: { id: string; cardId: string; date: string; amount: string }) => {
+        const result: RecargaRow[] = recargas.map((t) => {
           const usd = Number(t.amount);
           const ves = Math.round(usd * TIPO_CAMBIO * 100) / 100;
           const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
