@@ -25,24 +25,28 @@ export async function GET(request: Request) {
     const txQuery =
       txConditions.length > 0
         ? db
-            .select()
-            .from(transactions)
-            .where(and(...txConditions))
-            .orderBy(asc(transactions.date), asc(transactions.createdAt))
+          .select()
+          .from(transactions)
+          .where(and(...txConditions))
+          .orderBy(asc(transactions.date), asc(transactions.createdAt))
         : db.select().from(transactions).orderBy(asc(transactions.date), asc(transactions.createdAt));
 
-    let ratesQuery: Promise<{ date: string; rate: string }[]>;
+    let ratesList;
     try {
-      ratesQuery = db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
-    } catch {
-      await ensureExchangeRatesTable();
-      ratesQuery = db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+      ratesList = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+    } catch (err: any) {
+      const msg = (err?.message || "").toLowerCase();
+      if (msg.includes("does not exist") || msg.includes("relation")) {
+        await ensureExchangeRatesTable();
+        ratesList = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
+      } else {
+        throw err;
+      }
     }
 
-    const [cardsList, txList, ratesList] = await Promise.all([
+    const [cardsList, txList] = await Promise.all([
       db.select().from(cards).orderBy(asc(cards.createdAt)),
       txQuery,
-      ratesQuery,
     ]);
 
     const exchangeRatesMap: Record<string, number> = {};
