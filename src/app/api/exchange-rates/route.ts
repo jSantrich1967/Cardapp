@@ -73,9 +73,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ date: dateStr, rate: rateNum });
   } catch (e) {
-    console.error(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[exchange-rates POST]", e);
     return NextResponse.json(
-      { error: "Error al guardar tipo de cambio" },
+      { error: `Error al guardar tipo de cambio: ${msg}` },
       { status: 500 }
     );
   }
