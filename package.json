@@ -13,7 +13,10 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "tsx src/lib/db/seed.ts"
+    "db:seed": "tsx src/lib/db/seed.ts",
+    "db:import-backup": "tsx src/lib/db/import-backup.ts",
+    "db:fix-backup": "tsx scripts/fix-backup.ts",
+    "db:run-migrations": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",

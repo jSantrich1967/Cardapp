@@ -12,6 +12,8 @@ dist
 # Environment
 .env
 .env.local
+backup.json
+raw-backup.txt
 .env.development.local
 .env.test.local
 .env.production.local
