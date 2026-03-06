@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import {
   Select,
   SelectContent,
@@ -35,21 +36,27 @@ export default function ReconciliationPage() {
   const [mismatches, setMismatches] = useState<ReconItem[]>([]);
 
   useEffect(() => {
-    fetch("/api/cards")
+    fetchWithTimeout("/api/cards")
       .then((r) => r.json())
       .then((data) => {
-        setCards(data);
-        if (data.length > 0 && !cardId) setCardId(data[0].id);
-      });
+        const list = Array.isArray(data) ? data : [];
+        setCards(list);
+        if (list.length > 0 && !cardId) setCardId(list[0].id);
+      })
+      .catch(() => setCards([]));
   }, []);
 
   useEffect(() => {
     if (!cardId) return;
-    fetch(`/api/reconciliation?cardId=${cardId}`)
+    fetchWithTimeout(`/api/reconciliation?cardId=${cardId}`)
       .then((r) => r.json())
       .then((data) => {
         setItems(data.items || []);
         setMismatches(data.mismatches || []);
+      })
+      .catch(() => {
+        setItems([]);
+        setMismatches([]);
       });
   }, [cardId]);
 

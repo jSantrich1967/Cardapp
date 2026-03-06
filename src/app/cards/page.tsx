@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, CreditCard } from "lucide-react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface CardItem {
   id: string;
@@ -28,17 +29,27 @@ interface CardItem {
 export default function CardsPage() {
   const [cards, setCards] = useState<CardItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ cardholderName: "", last4: "" });
 
   const fetchCards = async () => {
-    const res = await fetch("/api/cards");
-    if (res.ok) {
-      const data = await res.json();
-      setCards(data);
+    setError(null);
+    try {
+      const res = await fetchWithTimeout("/api/cards");
+      if (res.ok) {
+        const data = await res.json();
+        setCards(data);
+      } else {
+        setError("Error al cargar tarjetas");
+      }
+    } catch {
+      setCards([]);
+      setError("No se pudo conectar. Revisa que el servidor esté corriendo.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -138,6 +149,15 @@ export default function CardsPage() {
 
       {loading ? (
         <p className="text-muted-foreground">Cargando...</p>
+      ) : error ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">{error}</p>
+            <Button variant="outline" className="mt-3" onClick={fetchCards}>
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       ) : cards.length === 0 ? (
         <Card>
           <CardContent className="pt-6">

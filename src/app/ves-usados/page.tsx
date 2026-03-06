@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { getCached, setCache } from "@/lib/cache";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -87,7 +88,7 @@ export default function VesUsadosPage() {
     } else {
       setLoading(true);
     }
-    fetch(`/api/ves-usados-data?${params}`, { cache: "no-store" })
+    fetchWithTimeout(`/api/ves-usados-data?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -120,6 +121,12 @@ export default function VesUsadosPage() {
           };
         });
         setRows(result);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCards([]);
+          setRows([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

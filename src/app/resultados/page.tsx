@@ -14,12 +14,12 @@ import Link from "next/link";
 import { TrendingUp, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCached, setCache } from "@/lib/cache";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { normalizeDateKey, normalizeRatesMap } from "@/lib/utils/date-keys";
 
 const TIPO_CAMBIO_RECARGA = 515; // Para calcular VES: USD × 515
 const FEE_MERCHANT_PCT = 0.04; // 4% por recarga en bolívares
 const STORAGE_KEY = "cardops_exchange_rates";
-const FETCH_TIMEOUT_MS = 45000; // 45 segundos - Supabase puede tardar en conectar (pooler o primera vez)
 
 function loadRatesFromStorage(): Record<string, number> {
   if (typeof window === "undefined") return {};
@@ -81,11 +81,7 @@ export default function ResultadosPage() {
       setLoading(true);
     }
 
-    // Timeout para evitar carga infinita si el API no responde
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    fetch(`/api/resultados?${params}`, { cache: "no-store", signal: controller.signal })
+    fetchWithTimeout(`/api/resultados?${params}`, { cache: "no-store", timeout: 45000 })
       .then((r) => {
         if (!r.ok) throw new Error(`Error ${r.status}`);
         return r.json();
@@ -122,12 +118,10 @@ export default function ResultadosPage() {
         }
       })
       .finally(() => {
-        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
-      controller.abort();
     };
   }, [filterCardId, filterFrom, filterTo, retryCount]);
 
@@ -135,7 +129,7 @@ export default function ResultadosPage() {
   const refreshRates = () => {
     const storedRates = normalizeRatesMap(loadRatesFromStorage());
     setExchangeRates(storedRates);
-    fetch("/api/exchange-rates", { cache: "no-store" })
+    fetchWithTimeout("/api/exchange-rates", { cache: "no-store" })
       .then(async (r) => {
         const text = await r.text();
         try {

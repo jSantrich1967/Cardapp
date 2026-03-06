@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { preprocessImageForOcr } from "@/lib/utils/image-preprocess";
 import { parseOcrToRows, extractCardInfo, type ParsedRow } from "@/lib/utils/ocr-parser";
 import { formatDateForDb } from "@/lib/utils/parse";
@@ -40,7 +41,7 @@ export default function ImportPage() {
   const [extractedLast4, setExtractedLast4] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/cards")
+    fetchWithTimeout("/api/cards")
       .then((r) => r.json())
       .then((data) => {
         const cardList = Array.isArray(data) ? data : [];

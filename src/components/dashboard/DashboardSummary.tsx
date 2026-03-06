@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { TrendingUp } from "lucide-react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 export function DashboardSummary() {
   const [data, setData] = useState<{
@@ -13,7 +14,7 @@ export function DashboardSummary() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/reports")
+    fetchWithTimeout("/api/reports")
       .then((r) => r.json())
       .then((d) => {
         if (d?.error) setData({ error: d.error });

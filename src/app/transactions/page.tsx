@@ -26,6 +26,7 @@ import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard 
 import { parseAmount } from "@/lib/utils/parse";
 import { Plus, Trash2, FileSpreadsheet, FileText } from "lucide-react";
 import { getCached, setCache } from "@/lib/cache";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -87,7 +88,7 @@ function TransactionsContent() {
     if (filterTo) params.set("to", filterTo);
     if (filterType && filterType !== "all") params.set("type", filterType);
     setLoading(true);
-    fetch(`/api/transactions-data?${params}`, { cache: "no-store" })
+    fetchWithTimeout(`/api/transactions-data?${params}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (data?.error) {
@@ -97,6 +98,10 @@ function TransactionsContent() {
         }
         setCards(Array.isArray(data?.cards) ? data.cards : []);
         setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
+      })
+      .catch(() => {
+        setCards([]);
+        setTransactions([]);
       })
       .finally(() => setLoading(false));
   };

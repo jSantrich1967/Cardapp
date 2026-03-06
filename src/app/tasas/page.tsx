@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { History, Plus, ArrowLeft } from "lucide-react";
 import { getCached, setCache } from "@/lib/cache";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { normalizeRatesMap } from "@/lib/utils/date-keys";
 
 const STORAGE_KEY = "cardops_exchange_rates";
@@ -57,7 +58,7 @@ export default function TasasPage() {
       setLoading(true);
     }
     setError(null);
-    fetch("/api/exchange-rates", { cache: "no-store" })
+    fetchWithTimeout("/api/exchange-rates", { cache: "no-store" })
       .then(async (r) => {
         const text = await r.text();
         try {
