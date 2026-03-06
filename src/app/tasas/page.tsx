@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { History, Plus, ArrowLeft } from "lucide-react";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { normalizeRatesMap } from "@/lib/utils/date-keys";
@@ -207,7 +208,9 @@ export default function TasasPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground py-8 text-center">Cargando...</p>
+            <div className="py-8 text-center">
+              <LoadingDots />
+            </div>
           ) : error ? (
             <p className="text-red-600 py-4">{error}</p>
           ) : sortedRates.length === 0 ? (

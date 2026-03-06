@@ -11,6 +11,7 @@ import postgres from "postgres";
 import { readFileSync } from "fs";
 
 const url =
+  process.env.SUPABASE_DIRECT_URL ||
   process.env.SUPABASE_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
   process.env.DATABASE_URL;

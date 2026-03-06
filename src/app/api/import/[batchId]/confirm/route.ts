@@ -116,90 +116,95 @@ export async function POST(
       });
     }
 
-    // Insert transactions
-    const inserted = await db.insert(transactions).values(toInsert).returning();
+    // Use a transaction for consistency
+    const result = await db.transaction(async (tx) => {
+      // Insert main transactions
+      const inserted = await tx.insert(transactions).values(toInsert).returning();
 
-    // Link OCR fee rows to their preceding PROCESADA (same card, same date)
-    const lastProcesadaByKey = new Map<string, string>();
-    for (const t of inserted) {
-      const key = `${t.cardId}-${t.date}`;
-      if (t.operationType === "PROCESADA") {
-        lastProcesadaByKey.set(key, t.id);
+      // Link OCR fee rows to their preceding PROCESADA (same card, same date)
+      const lastProcesadaByKey = new Map<string, string>();
+      for (const t of inserted) {
+        const key = `${t.cardId}-${t.date}`;
+        if (t.operationType === "PROCESADA") {
+          lastProcesadaByKey.set(key, t.id);
+        }
+        if (
+          (t.operationType === "FEE_VZLA" || t.operationType === "FEE_MERCHANT") &&
+          !t.parentTransactionId &&
+          lastProcesadaByKey.has(key)
+        ) {
+          await tx
+            .update(transactions)
+            .set({ parentTransactionId: lastProcesadaByKey.get(key)! })
+            .where(eq(transactions.id, t.id));
+        }
       }
-      if (
-        (t.operationType === "FEE_VZLA" || t.operationType === "FEE_MERCHANT") &&
-        !t.parentTransactionId &&
-        lastProcesadaByKey.has(key)
-      ) {
-        await db
-          .update(transactions)
-          .set({ parentTransactionId: lastProcesadaByKey.get(key)! })
-          .where(eq(transactions.id, t.id));
+
+      // Auto-generate fees for PROCESADA
+      for (let i = 0; i < inserted.length; i++) {
+        const t = inserted[i]!;
+        if (t.operationType !== "PROCESADA") continue;
+
+        const amount = Math.abs(Number(t.amount));
+        const feeVzla = computeFeeVzla(amount);
+        const feeMerchant = computeFeeMerchant(amount);
+
+        // Check if we already have these fees in the rows we're inserting
+        const rowHadFeeVzla = rows.some(
+          (r) =>
+            r.operationType === "FEE_VZLA" &&
+            r.fecha &&
+            datesWithinOneDay(new Date(r.fecha), new Date(t.date)) &&
+            feeMatchesExpected(Number(r.monto), feeVzla)
+        );
+        const rowHadFeeMerchant = rows.some(
+          (r) =>
+            r.operationType === "FEE_MERCHANT" &&
+            r.fecha &&
+            datesWithinOneDay(new Date(r.fecha), new Date(t.date)) &&
+            feeMatchesExpected(Number(r.monto), feeMerchant)
+        );
+
+        if (!rowHadFeeVzla) {
+          await tx.insert(transactions).values({
+            cardId: t.cardId,
+            date: t.date,
+            operationType: "FEE_VZLA",
+            amount: String(-feeVzla),
+            source: "import",
+            importBatchId: batchId,
+            parentTransactionId: t.id,
+          });
+        }
+        if (!rowHadFeeMerchant) {
+          await tx.insert(transactions).values({
+            cardId: t.cardId,
+            date: t.date,
+            operationType: "FEE_MERCHANT",
+            amount: String(-feeMerchant),
+            source: "import",
+            importBatchId: batchId,
+            parentTransactionId: t.id,
+          });
+        }
       }
-    }
 
-    // Auto-generate fees for PROCESADA
-    for (let i = 0; i < inserted.length; i++) {
-      const t = inserted[i]!;
-      if (t.operationType !== "PROCESADA") continue;
+      await tx
+        .update(importBatches)
+        .set({
+          status: "completed",
+          rowCount: inserted.length,
+          extractedCardName: batch.extractedCardName,
+          extractedLast4: batch.extractedLast4,
+        })
+        .where(eq(importBatches.id, batchId));
 
-      const amount = Math.abs(Number(t.amount));
-      const feeVzla = computeFeeVzla(amount);
-      const feeMerchant = computeFeeMerchant(amount);
-
-      // Check if we already have these fees in the rows we're inserting
-      const rowHadFeeVzla = rows.some(
-        (r) =>
-          r.operationType === "FEE_VZLA" &&
-          r.fecha &&
-          datesWithinOneDay(new Date(r.fecha), new Date(t.date)) &&
-          feeMatchesExpected(Number(r.monto), feeVzla)
-      );
-      const rowHadFeeMerchant = rows.some(
-        (r) =>
-          r.operationType === "FEE_MERCHANT" &&
-          r.fecha &&
-          datesWithinOneDay(new Date(r.fecha), new Date(t.date)) &&
-          feeMatchesExpected(Number(r.monto), feeMerchant)
-      );
-
-      if (!rowHadFeeVzla) {
-        await db.insert(transactions).values({
-          cardId: t.cardId,
-          date: t.date,
-          operationType: "FEE_VZLA",
-          amount: String(-feeVzla),
-          source: "import",
-          importBatchId: batchId,
-          parentTransactionId: t.id,
-        });
-      }
-      if (!rowHadFeeMerchant) {
-        await db.insert(transactions).values({
-          cardId: t.cardId,
-          date: t.date,
-          operationType: "FEE_MERCHANT",
-          amount: String(-feeMerchant),
-          source: "import",
-          importBatchId: batchId,
-          parentTransactionId: t.id,
-        });
-      }
-    }
-
-    await db
-      .update(importBatches)
-      .set({
-        status: "completed",
-        rowCount: inserted.length,
-        extractedCardName: batch.extractedCardName,
-        extractedLast4: batch.extractedLast4,
-      })
-      .where(eq(importBatches.id, batchId));
+      return { insertedCount: inserted.length };
+    });
 
     return NextResponse.json({
       success: true,
-      inserted: inserted.length,
+      inserted: result.insertedCount,
       batchId,
     });
   } catch (e) {

@@ -77,11 +77,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Mismo patrón que backup (delete + insert) para compatibilidad con pooler
-    await db.delete(exchangeRates).where(eq(exchangeRates.date, dateStr));
-    await db.insert(exchangeRates).values({
-      date: dateStr,
-      rate: String(rateNum),
+    // Mismo patrón que backup: transaccional para evitar perder datos si falla la inserción
+    await db.transaction(async (tx) => {
+      await tx.delete(exchangeRates).where(eq(exchangeRates.date, dateStr));
+      await tx.insert(exchangeRates).values({
+        date: dateStr,
+        rate: String(rateNum),
+      });
     });
 
     return NextResponse.json({ date: dateStr, rate: rateNum });

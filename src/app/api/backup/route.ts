@@ -96,59 +96,65 @@ export async function POST(request: Request) {
     const txArr = Array.isArray(body.transactions) ? body.transactions : [];
 
     await ensureExchangeRatesTable();
-
-    // Delete in order: transactions first (FK to cards), then cards, then exchange_rates
-    await db.delete(transactions);
-    await db.delete(cards);
-    await db.delete(exchangeRates);
-
     const rates = Array.isArray(body?.exchangeRates) ? body.exchangeRates : [];
 
-    if (rates.length > 0) {
-      await db.insert(exchangeRates).values(
-        rates.map((r: { date: string; rate: number }) => ({
-          date: String(r.date).slice(0, 10),
-          rate: String(r.rate),
-        }))
-      );
-    }
+    await db.transaction(async (tx) => {
+      // Delete in order: transactions first (FK to cards), then cards, then exchange_rates
+      await tx.delete(transactions);
+      await tx.delete(cards);
+      await tx.delete(exchangeRates);
 
-    if (cardsArr.length > 0) {
-      await db.insert(cards).values(
-        cardsArr.map((c: { id: string; cardholderName: string; last4: string; status?: string }) => ({
-          id: c.id,
-          cardholderName: c.cardholderName,
-          last4: c.last4,
-          status: c.status === "inactive" ? "inactive" : "active",
-        }))
-      );
-    }
+      if (rates.length > 0) {
+        await tx.insert(exchangeRates).values(
+          rates.map((r: { date: string; rate: number }) => ({
+            date: String(r.date).slice(0, 10),
+            rate: String(r.rate),
+          }))
+        );
+      }
 
-    if (txArr.length > 0) {
-      await db.insert(transactions).values(
-        txArr.map(
-          (t: {
-            id: string;
-            cardId: string;
-            date: string;
-            operationType: string;
-            amount: string;
-            notes?: string | null;
-            source?: string;
-            parentTransactionId?: string | null;
-          }) => ({
-            id: t.id,
-            cardId: t.cardId,
-            date: t.date,
-            operationType: t.operationType,
-            amount: t.amount,
-            notes: t.notes ?? null,
-            source: t.source ?? "manual",
-            parentTransactionId: t.parentTransactionId ?? null,
-          })
-        )
-      );
-    }
+      if (cardsArr.length > 0) {
+        await tx.insert(cards).values(
+          cardsArr.map((c: { id: string; cardholderName: string; last4: string; status?: string }) => ({
+            id: c.id,
+            cardholderName: c.cardholderName,
+            last4: c.last4,
+            status: c.status === "inactive" ? "inactive" : "active",
+          }))
+        );
+      }
+
+      if (txArr.length > 0) {
+        // Insert transactions in chunks if many, to avoid parameter limits (1000 at a time)
+        const chunkSize = 1000;
+        for (let i = 0; i < txArr.length; i += chunkSize) {
+          const chunk = txArr.slice(i, i + chunkSize);
+          await tx.insert(transactions).values(
+            chunk.map(
+              (t: {
+                id: string;
+                cardId: string;
+                date: string;
+                operationType: string;
+                amount: string;
+                notes?: string | null;
+                source?: string;
+                parentTransactionId?: string | null;
+              }) => ({
+                id: t.id,
+                cardId: t.cardId,
+                date: t.date,
+                operationType: t.operationType,
+                amount: t.amount,
+                notes: t.notes ?? null,
+                source: t.source ?? "manual",
+                parentTransactionId: t.parentTransactionId ?? null,
+              })
+            )
+          );
+        }
+      }
+    });
 
     return NextResponse.json({
       success: true,

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import * as XLSX from "xlsx";
@@ -272,7 +273,7 @@ export default function VesUsadosPage() {
       </Card>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
+        <LoadingDots />
       ) : error ? (
         <Card>
           <CardContent className="pt-6">

@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { TrendingUp, RefreshCw } from "lucide-react";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { Button } from "@/components/ui/button";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -82,9 +83,13 @@ export default function ResultadosPage() {
     }
 
     fetchWithTimeout(`/api/resultados?${params}`, { cache: "no-store", timeout: 45000 })
-      .then((r) => {
-        if (!r.ok) throw new Error(`Error ${r.status}`);
-        return r.json();
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const msg = [data?.error, data?.hint].filter(Boolean).join(" — ") || `Error ${r.status}`;
+          throw new Error(msg);
+        }
+        return data;
       })
       .then((data) => {
         if (cancelled) return;
@@ -112,7 +117,7 @@ export default function ResultadosPage() {
             setError(
               err.name === "AbortError"
                 ? "La solicitud tardó demasiado. Si usas Supabase, prueba SUPABASE_DIRECT_URL (puerto 5432) en .env.local en lugar del pooler (6543)."
-                : "No se pudieron cargar los resultados. Intenta de nuevo."
+                : (err instanceof Error ? err.message : "No se pudieron cargar los resultados. Intenta de nuevo.")
             );
           }
         }
@@ -324,13 +329,17 @@ export default function ResultadosPage() {
       </Card>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
+        <LoadingDots />
       ) : error ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-destructive font-medium">{error}</p>
+            <p className="text-destructive font-medium break-words">{error}</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Revisa .env.local: SUPABASE_DIRECT_URL (puerto 5432) suele ser más rápido que el pooler (6543).
+              Si el error menciona conexión o password: revisa .env.local. Prueba{" "}
+              <a href="/api/health" target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                /api/health
+              </a>{" "}
+              para más detalles.
             </p>
             <Button
               variant="outline"

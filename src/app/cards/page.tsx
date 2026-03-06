@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, CreditCard } from "lucide-react";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface CardItem {
@@ -148,7 +149,7 @@ export default function CardsPage() {
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
+        <LoadingDots />
       ) : error ? (
         <Card>
           <CardContent className="pt-6">

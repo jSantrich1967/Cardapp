@@ -25,6 +25,7 @@ import {
 import { getCurrentBalance, computeRunningBalance, computeRunningBalancePerCard } from "@/lib/utils/balance";
 import { parseAmount } from "@/lib/utils/parse";
 import { Plus, Trash2, FileSpreadsheet, FileText } from "lucide-react";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { getCached, setCache } from "@/lib/cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import * as XLSX from "xlsx";
@@ -464,7 +465,7 @@ function TransactionsContent() {
       </Card>
 
       {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
+        <LoadingDots />
       ) : (
         <Card>
           <CardContent className="pt-6">
@@ -605,7 +606,7 @@ function TransactionsContent() {
 
 export default function TransactionsPage() {
   return (
-    <Suspense fallback={<p className="text-muted-foreground">Cargando...</p>}>
+    <Suspense fallback={<LoadingDots />}>
       <TransactionsContent />
     </Suspense>
   );

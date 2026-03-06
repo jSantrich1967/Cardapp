@@ -61,9 +61,13 @@ export async function GET(request: Request) {
       exchangeRates: exchangeRatesMap,
     });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error(e);
     return NextResponse.json(
-      { error: "Error al cargar datos de resultados" },
+      {
+        error: "Error al cargar datos de resultados",
+        hint: msg.length > 200 ? msg.slice(0, 200) + "..." : msg,
+      },
       { status: 500 }
     );
   }
