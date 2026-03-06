@@ -52,8 +52,14 @@ export async function GET(request: Request) {
 
     const exchangeRatesMap: Record<string, number> = {};
     ratesList.forEach((r) => {
-      const dateKey = String(r.date).replace(/T.*/, "").slice(0, 10);
-      exchangeRatesMap[dateKey] = Number(r.rate);
+      if (r.date) {
+        const d = new Date(r.date);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateKey = `${y}-${m}-${day}`;
+        exchangeRatesMap[dateKey] = Number(r.rate);
+      }
     });
 
     return NextResponse.json({

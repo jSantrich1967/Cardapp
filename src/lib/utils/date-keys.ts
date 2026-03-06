@@ -5,9 +5,20 @@
 export function normalizeDateKey(dateStr: string): string {
   const s = String(dateStr ?? "").trim();
   const part = s.split("T")[0] ?? s;
-  const [y, m, d] = part.split("-");
+  // Manejar guiones o slashes
+  const parts = part.split(/[-/]/);
+  if (parts.length !== 3) return part;
+
+  // Si viene como DD-MM-YYYY (común en algunos imports)
+  if (parts[0].length === 2 && parts[2].length === 4) {
+    const [d, m, y] = parts;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // Asumir YYYY-MM-DD
+  const [y, m, d] = parts;
   if (!y || !m || !d) return part;
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  return `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
 export function normalizeRatesMap(

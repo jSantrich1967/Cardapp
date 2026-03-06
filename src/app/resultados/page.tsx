@@ -82,7 +82,7 @@ export default function ResultadosPage() {
       setLoading(true);
     }
 
-    fetchWithTimeout(`/api/resultados?${params}`, { cache: "no-store", timeout: 45000 })
+    fetchWithTimeout(`/api/resultados?${params}&t=${Date.now()}`, { cache: "no-store", timeout: 45000 })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
@@ -110,15 +110,10 @@ export default function ResultadosPage() {
       })
       .catch((err) => {
         if (!cancelled) {
-          // Solo mostrar error si no teníamos caché (evita sobrescribir datos buenos)
           if (!cached) {
             setCards([]);
             setTransactions([]);
-            setError(
-              err.name === "AbortError"
-                ? "La solicitud tardó demasiado. Si usas Supabase, prueba SUPABASE_DIRECT_URL (puerto 5432) en .env.local en lugar del pooler (6543)."
-                : (err instanceof Error ? err.message : "No se pudieron cargar los resultados. Intenta de nuevo.")
-            );
+            setError(err instanceof Error ? err.message : "No se pudieron cargar los resultados.");
           }
         }
       })
@@ -130,22 +125,14 @@ export default function ResultadosPage() {
     };
   }, [filterCardId, filterFrom, filterTo, retryCount]);
 
-  // Tasas: desde Histórico de tasas (mismo endpoint + localStorage)
   const refreshRates = () => {
-    const storedRates = normalizeRatesMap(loadRatesFromStorage());
-    setExchangeRates(storedRates);
-    fetchWithTimeout("/api/exchange-rates", { cache: "no-store" })
+    fetchWithTimeout(`/api/exchange-rates?t=${Date.now()}`, { cache: "no-store" })
       .then(async (r) => {
-        const text = await r.text();
-        try {
-          return JSON.parse(text);
-        } catch {
-          return {}; // Respuesta no-JSON: usar solo localStorage
-        }
+        const data = await r.json().catch(() => ({}));
+        return data;
       })
       .then((data) => {
-        const apiRates =
-          data && typeof data === "object" && !("error" in data) ? data : {};
+        const apiRates = data && typeof data === "object" && !("error" in data) ? data : {};
         const merged = normalizeRatesMap({
           ...apiRates,
           ...loadRatesFromStorage(),
