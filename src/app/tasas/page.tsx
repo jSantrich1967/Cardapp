@@ -58,7 +58,14 @@ export default function TasasPage() {
     }
     setError(null);
     fetch("/api/exchange-rates", { cache: "no-store" })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          throw new Error(text || "El servidor devolvió una respuesta no válida");
+        }
+      })
       .then((data) => {
         const apiRates =
           data && typeof data === "object" && !("error" in data) ? data : {};
@@ -70,7 +77,8 @@ export default function TasasPage() {
       })
       .catch((e) => {
         setRates(normalizeRatesMap(loadRatesFromStorage()));
-        setError(e instanceof Error ? e.message : "Error al cargar");
+        const msg = e instanceof Error ? e.message : "Error al cargar";
+        setError(msg.length > 200 ? "Error del servidor. Revisa la consola." : msg);
       })
       .finally(() => setLoading(false));
   }, []);

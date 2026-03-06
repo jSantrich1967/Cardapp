@@ -136,7 +136,14 @@ export default function ResultadosPage() {
     const storedRates = normalizeRatesMap(loadRatesFromStorage());
     setExchangeRates(storedRates);
     fetch("/api/exchange-rates", { cache: "no-store" })
-      .then((r) => r.json())
+      .then(async (r) => {
+        const text = await r.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {}; // Respuesta no-JSON: usar solo localStorage
+        }
+      })
       .then((data) => {
         const apiRates =
           data && typeof data === "object" && !("error" in data) ? data : {};

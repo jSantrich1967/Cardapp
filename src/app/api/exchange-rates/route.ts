@@ -12,6 +12,12 @@ export const maxDuration = 30;
  */
 export async function GET() {
   try {
+    if (!process.env.SUPABASE_DATABASE_URL && !process.env.DATABASE_URL && !process.env.NEON_DATABASE_URL && !process.env.SUPABASE_DIRECT_URL) {
+      return NextResponse.json(
+        { error: "Falta configurar la base de datos en variables de entorno." },
+        { status: 500 }
+      );
+    }
     let result;
     try {
       result = await db.select().from(exchangeRates).orderBy(asc(exchangeRates.date));
