@@ -19,7 +19,7 @@ import { normalizeDateKey, normalizeRatesMap } from "@/lib/utils/date-keys";
 const TIPO_CAMBIO_RECARGA = 515; // Para calcular VES: USD × 515
 const FEE_MERCHANT_PCT = 0.04; // 4% por recarga en bolívares
 const STORAGE_KEY = "cardops_exchange_rates";
-const FETCH_TIMEOUT_MS = 15000; // 15 segundos - evita carga infinita si el API no responde
+const FETCH_TIMEOUT_MS = 45000; // 45 segundos - Supabase puede tardar en conectar (pooler o primera vez)
 
 function loadRatesFromStorage(): Record<string, number> {
   if (typeof window === "undefined") return {};
@@ -115,7 +115,7 @@ export default function ResultadosPage() {
             setTransactions([]);
             setError(
               err.name === "AbortError"
-                ? "La solicitud tardó demasiado. Verifica tu conexión o la base de datos."
+                ? "La solicitud tardó demasiado. Si usas Supabase, prueba SUPABASE_DIRECT_URL (puerto 5432) en .env.local en lugar del pooler (6543)."
                 : "No se pudieron cargar los resultados. Intenta de nuevo."
             );
           }
@@ -320,7 +320,7 @@ export default function ResultadosPage() {
           <CardContent className="pt-6">
             <p className="text-destructive font-medium">{error}</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Revisa que la base de datos esté configurada en .env.local y que el servidor esté corriendo.
+              Revisa .env.local: SUPABASE_DIRECT_URL (puerto 5432) suele ser más rápido que el pooler (6543).
             </p>
             <Button
               variant="outline"

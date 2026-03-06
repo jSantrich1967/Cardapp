@@ -51,7 +51,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    if (!process.env.SUPABASE_DATABASE_URL && !process.env.DATABASE_URL && !process.env.NEON_DATABASE_URL) {
+    if (!process.env.SUPABASE_DATABASE_URL && !process.env.DATABASE_URL && !process.env.NEON_DATABASE_URL && !process.env.SUPABASE_DIRECT_URL) {
       return NextResponse.json(
         { error: "Falta configurar SUPABASE_DATABASE_URL (o DATABASE_URL) en las variables de entorno." },
         { status: 500 }

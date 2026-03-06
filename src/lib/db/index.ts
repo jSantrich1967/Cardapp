@@ -7,15 +7,23 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-// Prioridad: SUPABASE_DIRECT_URL (5432) > SUPABASE_DATABASE_URL (pooler 6543) > NEON > DATABASE_URL > POSTGRES_URL
-// Si el pooler falla, usa SUPABASE_DIRECT_URL desde Supabase Dashboard → Settings → Database → Direct connection
-let connectionString =
-  process.env.SUPABASE_DIRECT_URL ||
-  process.env.SUPABASE_DATABASE_URL ||
-  process.env.NEON_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  "";
+// Vercel: usar pooler (6543) con workaround - más rápido que conexión directa en serverless
+// Local: SUPABASE_DIRECT_URL (5432) o pooler
+let connectionString = "";
+if (process.env.VERCEL && process.env.SUPABASE_DATABASE_URL) {
+  connectionString = process.env.SUPABASE_DATABASE_URL;
+  if (!connectionString.includes("workaround=supabase-pooler.vercel")) {
+    connectionString += (connectionString.includes("?") ? "&" : "?") + "workaround=supabase-pooler.vercel";
+  }
+} else {
+  connectionString =
+    process.env.SUPABASE_DIRECT_URL ||
+    process.env.SUPABASE_DATABASE_URL ||
+    process.env.NEON_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    "";
+}
 
 // El * en contraseñas rompe el parseo de la URL; codificar como %2A
 if (connectionString && connectionString.includes("*") && !connectionString.includes("%2A")) {
@@ -27,11 +35,10 @@ if (!connectionString) {
 }
 
 // For query purposes - connect_timeout y ssl para Supabase
-// En Vercel/serverless usar max: 1 para evitar agotar el pool de conexiones
-// Si falla con pooler (6543), prueba URL directa: postgresql://postgres:PASS@db.PROJECT.supabase.co:5432/postgres
+// En Vercel: pooler con workaround; max: 1 para serverless
 const client = postgres(connectionString, {
   prepare: false,
-  connect_timeout: 60,
+  connect_timeout: process.env.VERCEL ? 15 : 60,
   idle_timeout: 20,
   max: process.env.VERCEL ? 1 : 10,
   ssl: "require",
