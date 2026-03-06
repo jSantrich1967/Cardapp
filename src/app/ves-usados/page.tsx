@@ -35,6 +35,7 @@ interface RecargaRow {
   date: string;
   usd: number;
   ves: number;
+  vesUsdMercado: number;
   feeMerchant: number;
   feeUsdMercado: number;
   saldo: number;
@@ -99,6 +100,7 @@ export default function VesUsadosPage() {
         const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
         const dateKey = normalizeDateKey(t.date);
         const rate = rates[dateKey] || TIPO_CAMBIO;
+        const vesUsdMercado = ves / rate;
         const feeUsdMercado = feeMerchant / rate;
 
         saldoAcum += ves + feeMerchant;
@@ -108,6 +110,7 @@ export default function VesUsadosPage() {
           date: t.date,
           usd,
           ves,
+          vesUsdMercado,
           feeMerchant,
           feeUsdMercado,
           saldo: saldoAcum,
@@ -143,6 +146,7 @@ export default function VesUsadosPage() {
           const feeMerchant = Math.round(ves * FEE_MERCHANT_PCT * 100) / 100;
           const dateKey = normalizeDateKey(t.date);
           const rate = rates[dateKey] || TIPO_CAMBIO;
+          const vesUsdMercado = ves / rate;
           const feeUsdMercado = feeMerchant / rate;
 
           saldoAcum += ves + feeMerchant;
@@ -152,6 +156,7 @@ export default function VesUsadosPage() {
             date: t.date,
             usd,
             ves,
+            vesUsdMercado,
             feeMerchant,
             feeUsdMercado,
             saldo: saldoAcum,
@@ -178,7 +183,7 @@ export default function VesUsadosPage() {
   const totalVes = rows.length > 0 ? rows[rows.length - 1]!.saldo : 0;
 
   const exportExcel = () => {
-    const headers = ["Fecha", "Tarjeta", "USD$", "VES", "Fee Merchant 4%", "Fee USD (Mercado)", "Saldo"];
+    const headers = ["Fecha", "Tarjeta", "USD (Recarga)", "VES", "VES USD (Mercado)", "Fee 4%", "Fee USD (Mercado)", "Saldo"];
     const exportRows = rows.map((r) => {
       const card = cardMap.get(r.cardId);
       const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : r.cardId;
@@ -187,6 +192,7 @@ export default function VesUsadosPage() {
         cardLabel,
         r.usd.toFixed(2),
         `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+        `-$${r.vesUsdMercado.toFixed(2)}`,
         `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         `-$${r.feeUsdMercado.toFixed(2)}`,
         `-${r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
@@ -204,7 +210,7 @@ export default function VesUsadosPage() {
     doc.setFontSize(11);
     doc.text(`Generado: ${new Date().toLocaleDateString("es")} | Tipo cambio: ${TIPO_CAMBIO}`, 14, 30);
 
-    const headers = ["Fecha", "Tarjeta", "USD$", "VES", "Fee 4%", "Fee USD (Mercado)", "Saldo"];
+    const headers = ["Fecha", "Tarjeta", "USD Rec.", "VES", "VES USD Merc.", "Fee 4%", "Fee USD Merc.", "Saldo"];
     const body = rows.map((r) => {
       const card = cardMap.get(r.cardId);
       const cardLabel = card ? `${card.cardholderName} •••• ${card.last4}` : r.cardId;
@@ -213,6 +219,7 @@ export default function VesUsadosPage() {
         cardLabel,
         r.usd.toFixed(2),
         `-${r.ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+        `-$${r.vesUsdMercado.toFixed(2)}`,
         `-${r.feeMerchant.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
         `-$${r.feeUsdMercado.toFixed(2)}`,
         `-${r.saldo.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
@@ -325,11 +332,12 @@ export default function VesUsadosPage() {
                   >
                     <th className="p-3">Fecha</th>
                     <th className="p-3">Tarjeta</th>
-                    <th className="p-3">USD$</th>
+                    <th className="p-3">USD Rec.</th>
                     <th className="p-3">VES</th>
-                    <th className="p-3">Fee Merchant 4%</th>
-                    <th className="p-3 text-emerald-300">Fee USD (Mercado)</th>
-                    <th className="p-3">Saldo</th>
+                    <th className="p-3 text-emerald-300">VES USD Merc.</th>
+                    <th className="p-3">Fee 4% (VES)</th>
+                    <th className="p-3 text-emerald-300">Fee USD Merc.</th>
+                    <th className="p-3">Saldo VES</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,10 +368,18 @@ export default function VesUsadosPage() {
                           })}
                         </td>
                         <td className="p-3 border-b border-gray-200 text-right text-emerald-600 font-bold">
-                          -${r.feeUsdMercado.toFixed(2)}
+                          -${r.vesUsdMercado.toFixed(2)}
                           <div className="text-[10px] text-muted-foreground font-normal">
                             (tasa: {exchangeRates[normalizeDateKey(r.date)] ? exchangeRates[normalizeDateKey(r.date)] : "515*"})
                           </div>
+                        </td>
+                        <td className="p-3 border-b border-gray-200 text-right text-amber-600">
+                          -{r.feeMerchant.toLocaleString("es-VE", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="p-3 border-b border-gray-200 text-right text-emerald-600 font-bold">
+                          -${r.feeUsdMercado.toFixed(2)}
                         </td>
                         <td className="p-3 border-b border-gray-200 text-right font-medium text-amber-600">
                           -{r.saldo.toLocaleString("es-VE", {
